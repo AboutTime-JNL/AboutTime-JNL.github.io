@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>位姿表示与变换 | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>位姿表示与变换</h1>
+  <div class="meta">发布于：2026-02-02</div>
+  
+  <div class="content">
+    <ul>
+<li>位姿建模分为两种，一种位置+姿态分开，一种位姿一体化建模</li>
+</ul>
+<h1 id="位置姿态">位置+姿态</h1>
+<ul>
+<li><p>位置一般可以直接用平移向量进行表示，关键在于姿态表示，对于姿态表示有几个方面</p>
+<ul>
+<li><p>是否可以表示所有姿态，是否存在奇异性</p></li>
+<li><p>求差，求导（速度）计算是否方便</p></li>
+<li><p>姿态速度与关节速度之间的雅可比矩阵是什么</p></li>
+</ul></li>
+</ul>
+<h2 id="李群so_3">李群（<span class="math inline">\(SO_3\)</span>）</h2>
+<ul>
+<li><p><span
+class="math inline">\(SO_3\)</span>就是所谓的旋转矩阵</p></li>
+<li><p>运算</p>
+<ul>
+<li><p>求差</p></li>
+<li><p>求导：旋转矩阵的导数个人理解是每个轴方向向量随时间变换的导数，旋转矩阵的导数与角速度（个人理解就是轴角的导数）之间的关系</p></li>
+</ul>
+<p><img src="位姿表示-image-8.png" /></p>
+<p><img src="位姿表示-image-7.png" /></p></li>
+</ul>
+<h2 id="李代数so_3">李代数（<span
+class="math inline">\(so_3\)</span>）</h2>
+<ul>
+<li><p>李代数由三维向量转化而来的反对称矩阵构成，注意同一个李群与两类李代数相关</p>
+<ul>
+<li>旋转向量构成的李代数：通过罗德里格斯公式构建对数/指数映射，旋转向量表示为<span
+class="math inline">\(\phi=\theta\bm{a}\)</span></li>
+</ul>
+<p><img src="位姿表示-image-9.png" /></p>
+<p><img src="位姿表示-image-6.png" /></p>
+<ul>
+<li>角速度构成的李代数：可以映射到两个角速度，一个表示在世界坐标系下，一个表示在动系下，前者写成<span
+class="math inline">\(\dot{R}=[\omega]R\)</span></li>
+</ul>
+<p><img src="位姿表示-image-5.png" /></p>
+<ul>
+<li>两种李代数之间的关系：在特定初始条件下，利用时间t作为参数，对角速度进行积分得到旋转向量</li>
+</ul>
+<p><img src="位姿表示-image-4.png" /></p></li>
+<li><p>李代数代表了李群的切空间</p></li>
+</ul>
+<h2 id="四元数rav">四元数<span
+class="math inline">\(r=[a,V]\)</span></h2>
+<ul>
+<li><p>V为三维向量</p></li>
+<li><p>运算：</p>
+<ul>
+<li><p>$[a,V] =[ab-VU,aU+bV+VU] $</p></li>
+<li><p>由叉乘的反交换律可得，<span class="math inline">\(r_1\cdot
+r_2=r_2^*\cdot r_1=r_2\cdot r_1^*\)</span></p></li>
+<li><p><span
+class="math inline">\(r^{-1}=\dfrac{r^*}{\|r\|^2}\)</span></p></li>
+<li><p>定义算子<span
+class="math inline">\(vec(r)=[a,v_1,v_2,v_3],H^+(r)=\begin{bmatrix}a
+&amp; -v_1 &amp; -v_2 &amp; -v_3 \\v_1 &amp; a &amp; -v_3 &amp; v_2
+\\v_2 &amp; v_3 &amp; a &amp; -v_1 \\ v_3 &amp; -v_2 &amp; v_1 &amp; a
+\end{bmatrix} , H^-(r)=\begin{bmatrix}a &amp; -v_1 &amp; -v_2 &amp; -v_3
+\\v_1 &amp; a &amp; v_3 &amp; -v_2 \\v_2 &amp; -v_3 &amp; a &amp; v_1 \\
+v_3 &amp; v_2 &amp; -v_1 &amp; a \end{bmatrix}\)</span>，则<span
+class="math inline">\(vec(r_1r_2)=H^+(r_1)vec(r_2)=H^-(r_2)vec(r_1)\)</span></p></li>
+</ul></li>
+<li><p>纯四元数：a=0</p></li>
+<li><p>几何映射：</p>
+<ul>
+<li><p>绕T轴旋转<span class="math inline">\(\theta\)</span>角： <span
+class="math inline">\(a=cos(\theta/2),V=sin(\theta/2)\cdot
+T\)</span></p></li>
+<li><p>几何变换：<span
+class="math inline">\(v_1=rv_0r^{-1}\)</span>（将V视为纯四元数）,由于<span
+class="math inline">\(\|r\|=1\)</span>，所以<span
+class="math inline">\(v_1=rv_0r^{-1}=rv_0r^*\)</span></p></li>
+<li><p>反向旋转即为四元数的共轭</p></li>
+</ul></li>
+<li><p>四元数雅可比矩阵与几何雅可比矩阵（轴角雅可比矩阵）之间的关系？</p></li>
+</ul>
+<h2 id="轴角旋转向量">轴角/旋转向量</h2>
+<ul>
+<li>旋转向量表示为<span
+class="math inline">\(\phi=\theta\bm{n}\)</span>，其实四元数与轴角是同一种表示方法，不过四元数建立了系统的运算法则，更加便于计算</li>
+</ul>
+<h2 id="转换关系">转换关系</h2>
+<table>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 30%" />
+<col style="width: 3%" />
+<col style="width: 30%" />
+<col style="width: 31%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>李群</th>
+<th>李代数</th>
+<th>四元数</th>
+<th>轴角</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>李群</td>
+<td>\</td>
+<td>……</td>
+<td><img src="位姿表示-image-3.png" /></td>
+<td><img src="位姿表示-image-10.png" /></td>
+</tr>
+<tr class="even">
+<td>李代数</td>
+<td>……</td>
+<td>\</td>
+<td></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>四元数</td>
+<td><img src="位姿表示-image-1.png" /></td>
+<td></td>
+<td>\</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>轴角</td>
+<td><img src="位姿表示-image.png" /></td>
+<td></td>
+<td><img src="位姿表示-image-2.png" /></td>
+<td>\</td>
+</tr>
+</tbody>
+</table>
+<h1 id="位姿一体化">位姿一体化</h1>
+<ul>
+<li>位姿一体化建模的情况下，二者之间是否还存在量纲不一致问题？</li>
+</ul>
+<h2 id="对偶四元数qq_rq_depsilon">对偶四元数<strong><span
+class="math inline">\(q=q_r+q_d\epsilon\)</span></strong></h2>
+<h3 id="对偶数-tababepsilon">对偶数 <span
+class="math inline">\(t=&lt;a,b&gt;=a+b\epsilon\)</span></h3>
+<ul>
+<li><p><span
+class="math inline">\(\epsilon\)</span>是一个与实数域垂直的维度，其满足<span
+class="math inline">\(\epsilon ^2=0\)</span></p></li>
+<li><p>运算：</p>
+<ul>
+<li><p><span
+class="math inline">\((a_1+b_1\epsilon)(a_2+b_2\epsilon)=a_1a_2+(a_1b_2+b_1a_2)\epsilon\)</span></p></li>
+<li><p><span
+class="math inline">\(t^{-1}=\dfrac{t^*}{\|t\|^2}\)</span></p></li>
+<li><p>复杂运算：利用泰勒展开可得 <span
+class="math inline">\(f(t)=f(a)+f&#39;(a)b\epsilon\)</span></p></li>
+</ul></li>
+</ul>
+<h3 id="对偶四元数qq_rq_depsilon-1">对偶四元数<span
+class="math inline">\(q=q_r+q_d\epsilon\)</span></h3>
+<ul>
+<li><p>运算：</p>
+<ul>
+<li><p>存在三种共轭：对偶四元数定义：<span
+class="math inline">\(q^*\)</span>,对偶数定义：<span
+class="math inline">\(\overline{q}\)</span>,复合：<span
+class="math inline">\(\overline{q}^*\)</span></p></li>
+<li><p>范数：对偶四元数的范数还是对偶四元数，但是实部中V为实数：<span
+class="math inline">\(\|q\|=\sqrt{qq^*}=\|q_r\|+\dfrac{q_dq_r^*+q_rq_d^*}{2\|q_r\|}\epsilon=\sqrt{\|q_r\|^2+2vec(q_r)\cdot
+vec(q_d)\epsilon}\)</span></p></li>
+<li><p>对于四元数和对偶四元数都满足：<span
+class="math inline">\((q_1q_2)^*=q_2^*q_1^*\)</span></p></li>
+<li><p>对于对偶数和对偶四元数都满足：<span
+class="math inline">\(\overline{(q_1q_2)}=\overline{q_1}\overline{q_2}\)</span></p></li>
+<li><p>对偶四元数满足：<span
+class="math inline">\(\|q_1q_2\|=\|q_1\|\|q_2\|\)</span></p></li>
+<li><p>定义针对对偶四元数的Hamilton算子：<span
+class="math inline">\(H^{\pm}(q)=\begin{bmatrix}H^{\pm}(q_r) &amp; 0 \\
+H^{\pm}(q_d) &amp;
+H^{\pm}(q_r)\end{bmatrix}\)</span>，即可得到与四元数类似的计算公式</p></li>
+</ul></li>
+<li><p>单位对偶四元数条件：<span class="math inline">\(\|q_r\|=1\quad
+and\quad q_dq_r^*+q_rq_d^*=0\)</span></p></li>
+<li><p>几何映射：</p>
+<ul>
+<li><p>待变换四元数<span
+class="math inline">\(v_0\)</span>写成对偶四元数<span
+class="math inline">\([1,v_0]\)</span>，变换后的对偶四元数为<span
+class="math inline">\([1,v_1]=q[1,v_0]q^*\)</span>，u为变换对偶四元数</p></li>
+<li><p>旋转：将四元数r拓展成单位对偶四元数<span
+class="math inline">\([r,0]\)</span>，即为q</p></li>
+<li><p>平移：将平移向量 <span
+class="math inline">\((p_1,p_2,p_3)\)</span> 写成四元数<span
+class="math inline">\(p=[0,(p_1,p_2,p_3)]\)</span>，再转换为单位对偶四元数<span
+class="math inline">\(q=[1,\dfrac{1}{2}p]\)</span>。注意，<strong>待变换四元数的平移变换与参考坐标系的平移变化相反</strong></p></li>
+</ul></li>
+<li><p>旋转和平移相乘后仍为单位对偶四元数</p></li>
+<li><p>给定一个对偶四元数，可以拆解为先平移后旋转的形式：<span
+class="math inline">\(r=q_r\quad and \quad p =
+2q_dq_r^*\)</span></p></li>
+<li><p>当三维空间中的直线用对偶四元数表示，这种坐标称为Pluecker坐标，对应的线称为Pluecker线</p></li>
+</ul>
+<h3 id="机械臂运动学模型">机械臂运动学模型</h3>
+<ul>
+<li>MDH参数与两关节之间的变换四元数关系：</li>
+</ul>
+<p><span class="math inline">\(\begin{aligned}
+q_r &amp;=[h_1,h_2,-h_3,h_4];\\
+q_d &amp;=[\dfrac{-d\cdot h_4-a\cdot h_2}{2},-\dfrac{-d\cdot h_3+a\cdot
+h_1}{2},\dfrac{-d\cdot h_2-a\cdot h_4}{2},\dfrac{d\cdot h_1-a\cdot
+h_3}{2}];\\
+h_1
+&amp;=cos(\dfrac{\theta}{2})cos(\dfrac{\alpha}{2}),h_2=cos(\dfrac{\theta}{2})sin(\dfrac{\alpha}{2}),h_3=sin(\dfrac{\theta}{2})sin(\dfrac{\alpha}{2}),h_4=sin(\dfrac{\theta}{2})cos(\dfrac{\alpha}{2})
+\end{aligned}\)</span></p>
+<ul>
+<li>雅可比：公式比较复杂，参见论文《Two-arm Manipulation: From
+Manipulators to Enhanced Human-Robot Collaboration》</li>
+</ul>
+<h3 id="双臂机器人">双臂机器人</h3>
+<ul>
+<li><p>两手末端的相对位姿表示为：<span
+class="math inline">\(x_r^{E2}=x_{E2}^*x_{E1}\)</span></p></li>
+<li><p>两手末端中间的绝对位姿表示为：<span
+class="math inline">\(x_a=x_{E2}(x_r^{E2})^{0.5};(x_r^{E2})^{0.5}=exp(\dfrac{1}{2}log(x_r^{E2}))\)</span></p></li>
+</ul>
+<h2 id="李群se_3">李群（<span class="math inline">\(SE_3\)</span>）</h2>
+<h2 id="李代数se_3">李代数（<span
+class="math inline">\(se_3\)</span>）</h2>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>
