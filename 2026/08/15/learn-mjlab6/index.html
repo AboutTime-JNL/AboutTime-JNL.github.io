@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——Envs（Mjlab Learning - Envs） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——Envs（Mjlab Learning - Envs）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <h1 id="mjlab11envs">Mjlab（11）——Envs</h1>
+<p>该目录提供环境层封装，尤其是基于管理器（manager-based）的强化学习环境定义与交互类型约定，负责组织
+reset/step 语义、观测与回报流程，并向训练框架暴露标准化接口。</p>
+<h1 id="manager_based_rl_env.py">manager_based_rl_env.py</h1>
+<blockquote>
+<p>核心环境实现文件，定义配置类与主环境类，负责 scene/sim 初始化、各
+manager 装配、reset/step 主循环、观测奖励终止计算、事件与课程更新等</p>
+</blockquote>
+<h1 id="types.py">types.py</h1>
+<blockquote>
+<p>环境接口类型定义，给向量化观测与 step 返回值提供统一类型别名</p>
+</blockquote>
+<h1 id="mdp">Mdp</h1>
+<h2 id="observations.py">observations.py</h2>
+<blockquote>
+<p>观测项函数集合（如基座速度、重力投影、关节状态、历史动作、命令、传感器读数等）</p>
+</blockquote>
+<h2 id="rewards.py">rewards.py</h2>
+<blockquote>
+<p>奖励项函数集合（存活、终止惩罚、关节代价、动作平滑、姿态/功耗等）</p>
+</blockquote>
+<h2 id="terminations.py">terminations.py</h2>
+<blockquote>
+<p>终止条件函数集合（超时、姿态异常、高度过低、NaN 检测等）</p>
+</blockquote>
+<h2 id="events.py">events.py</h2>
+<blockquote>
+<p>事件函数集合（重置场景、重置根状态/关节、外力扰动、冲量施加、地形随机化等）</p>
+</blockquote>
+<h2 id="curriculums.py">curriculums.py</h2>
+<blockquote>
+<p>课程学习规则函数集合，用于按训练阶段动态调节 reward/任务难度参数</p>
+</blockquote>
+<h2 id="metrics.py">metrics.py</h2>
+<blockquote>
+<p>训练指标函数集合，用于记录额外监控量（与 reward 解耦）</p>
+</blockquote>
+<h2 id="actions">Actions</h2>
+<h3 id="actions.py">actions.py</h3>
+<blockquote>
+<p>通用关节/腱/site 动作项实现（缩放、偏置、裁剪及写入目标）</p>
+</blockquote>
+<h3 id="differential_ik.py">differential_ik.py</h3>
+<blockquote>
+<p>任务空间差分 IK 动作项，把末端位姿命令实时转换为关节目标</p>
+</blockquote>
+<h2 id="dr-domain-randomization">Dr (Domain Randomization)</h2>
+<p>Each function writes to a single field on <code>sim.model</code> (the
+MuJoCo Warp model). For example, <code>dr.geom_friction</code> writes to
+<code>sim.model.geom_friction</code>, <code>dr.body_mass</code> writes
+to <code>sim.model.body_mass</code>, and so on. Most share the signature
+<code>(env, env_ids, ranges, ...)</code>, with <code>distribution</code>
+and <code>operation</code> controlling sampling and application (see <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/randomization.html#dr-parameters">Parameters</a>).
+Some functions have a more readable name than the underlying MuJoCo
+field; in those cases the raw field name is available as an alias
+(<code>dr.body_com_offset</code> and <code>dr.body_ipos</code> are the
+same function).</p>
+<h3 id="types.py-1">_types.py</h3>
+<blockquote>
+<p>DR
+的基础类型系统，定义操作（abs/scale/add）与分布（uniform/log_uniform/gaussian）及解析器</p>
+</blockquote>
+<h3 id="core.py">_core.py</h3>
+<blockquote>
+<p>DR 私有核心引擎，负责按实体索引和轴向范围对模型字段执行随机化写入</p>
+</blockquote>
+<h3 id="geom.py">geom.py</h3>
+<blockquote>
+<p>几何体参数随机化（尺寸、摩擦、颜色、位姿）</p>
+</blockquote>
+<h3 id="body.py">body.py</h3>
+<blockquote>
+<p>刚体参数随机化（质量、质心、姿态/位置、惯性相关）</p>
+</blockquote>
+<h3 id="joint.py">joint.py</h3>
+<blockquote>
+<p>关节/DOF 参数随机化（阻尼、摩擦、限位、默认位等）</p>
+</blockquote>
+<h3 id="site.py">site.py</h3>
+<blockquote>
+<p>site 位姿参数随机化</p>
+</blockquote>
+<h3 id="camera.py">camera.py</h3>
+<blockquote>
+<p>相机参数随机化（位置、朝向、内参/FOV）</p>
+</blockquote>
+<h3 id="light.py">light.py</h3>
+<blockquote>
+<p>光源参数随机化（位置、方向）</p>
+</blockquote>
+<h3 id="material.py">material.py</h3>
+<blockquote>
+<p>材质参数随机化（如 RGBA）</p>
+</blockquote>
+<h3 id="tendon.py">tendon.py</h3>
+<blockquote>
+<p>腱传动参数随机化（刚度、阻尼、摩擦等）</p>
+</blockquote>
+<h3 id="actuator.py">actuator.py</h3>
+<blockquote>
+<p>执行器相关参数随机化（如 PD 增益、力矩限制）</p>
+</blockquote>
+<p>The functions above all write to a single <code>sim.model</code>
+field. The functions below operate at the mjlab entity level instead,
+because they touch multiple model fields at once or modify entity state
+that doesn’t live on the MuJoCo model.</p>
+<h3 id="其他">其他</h3>
+<h3 id="pseudo-inertia-randomization">Pseudo-inertia randomization</h3>
+<p><code>dr.pseudo_inertia</code> jointly randomizes
+<code>body_mass</code>, <code>body_ipos</code>,
+<code>body_inertia</code>, and <code>body_iquat</code> while
+guaranteeing physical consistency for any perturbation magnitude. Unlike
+randomizing these fields independently (which can produce negative
+masses, imaginary principal moments, or triangle-inequality violations),
+<code>pseudo_inertia</code> parameterizes inertia through the
+<em>pseudo-inertia matrix</em></p>
+<p>and ensures the result is always physically valid.</p>
+<p>The pseudo-inertia matrix</p>
+<p>is a</p>
+<p>symmetric positive-definite matrix that encodes mass, center of mass,
+and the full rotational inertia tensor in a single object:</p>
+<p>where</p>
+<p>is mass (body_mass), is the center of mass (body_ipos), is the vector
+of principal inertia moments (body_inertia), and is the</p>
+<p>inertia tensor at the body-frame origin. The inertia tensor is
+constructed by rotating the diagonal principal moments into the body
+frame and applying the parallel-axis theorem:</p>
+<p>where</p>
+<p>is the body-to-principal-frame quaternion (body_iquat) and</p>
+<p>is its rotation matrix.</p>
+<p>The math follows <a
+target="_blank" rel="noopener" href="https://par.nsf.gov/servlets/purl/10347458">Rucker &amp; Wensing,
+“Smooth Parameterization of Rigid-Body Inertia,” IEEE RA-L 2022</a>.</p>
+<p>is factored via Cholesky as . A perturbation is applied through an
+upper-triangular matrix</p>
+<p>:</p>
+<p>which is guaranteed positive definite for any</p>
+<p>. The perturbed inertia tensor is then decomposed back into MuJoCo
+fields: the inverse parallel-axis theorem shifts</p>
+<p>back to the COM, and eigendecomposition extracts the principal
+moments (body_inertia) and principal-frame rotation (body_iquat). This
+is exact for any perturbation magnitude.</p>
+<p>The 10 parameters of</p>
+<p>control different physical effects:</p>
+<p>Example</p>
+<p>events = {<span>#</span> Isotropic mass scaling + small COM
+variation."body_inertia_dr":
+EventTermCfg(mode="reset",func=dr.pseudo_inertia,params={"asset_cfg":
+SceneEntityCfg("robot", body_names=["torso"]),"alpha_range": (-0.1,
+0.1), # ±10% mass/inertia scaling"t_range": (-0.02, 0.02), # ±2 cm COM
+shift},),# Anisotropic stretching (x stiffer than
+y/z)."body_inertia_aniso_dr":
+EventTermCfg(mode="startup",func=dr.pseudo_inertia,params={"asset_cfg":
+SceneEntityCfg("robot", body_names=[".*"]),"alpha_range": (-0.2,
+0.2),"d1_range": (-0.1, 0.1),"d2_range": (-0.3, 0.3),"d3_range": (-0.3,
+0.3),},),}</p>
+<h2 id="safety-of-runtime-model-changes">Safety of Runtime Model
+Changes</h2>
+<p>In C MuJoCo, modifying <code>mjModel</code> fields at runtime can be
+unsafe: some changes invalidate internal acceleration structures (BVH)
+or leave derived quantities stale. MuJoCo Warp has a different collision
+pipeline, so many of these concerns do not apply.</p>
+<p>Two architectural differences matter most:</p>
+<ol type="1">
+<li><p><strong>No collision BVH.</strong> C MuJoCo builds a static
+bounding-volume hierarchy (BVH) for midphase collision pruning. Changing
+<code>body_pos</code>/<code>body_quat</code> of a static body
+invalidates that tree. MuJoCo Warp uses NxN or sweep-and-prune
+broadphase instead, so there is no static tree to invalidate.</p></li>
+<li><p><strong>Local bounding boxes.</strong> <code>geom_aabb</code> in
+MuJoCo Warp is a <em>local</em> bounding box (center + half-size in the
+geom frame). The broadphase transforms it to world space every step
+using <code>geom_xpos</code>/<code>geom_xmat</code> from forward
+kinematics. In C MuJoCo, the BVH caches world-space bounds, so any
+change to <code>geom_pos</code>/<code>geom_quat</code> makes them
+stale.</p></li>
+</ol>
+<p>The table below shows which fields are safe to randomize in mjlab and
+how that compares to C MuJoCo.</p>
+<p>Static-body caveat for <code>geom_pos</code>/<code>geom_quat</code>
+and <code>body_pos</code>/<code>body_quat</code></p>
+<p>MuJoCo Warp’s forward kinematics skips geoms that are both
+<strong>world-welded</strong> (<code>body_weldid == 0</code>) and
+<strong>not descended from a mocap body</strong>
+(<code>body_mocapid[root] == -1</code>). For such geoms,
+<code>geom_xpos</code>/<code>geom_xmat</code> are computed once during
+<code>make_data</code> and never updated. Changing <code>geom_pos</code>
+or the parent <code>body_pos</code> would leave the world-space
+collision position stale.</p>
+<p>In practice this affects only bare <code>&lt;geom&gt;</code> elements
+placed directly on the <code>&lt;worldbody&gt;</code> in XML (e.g. a
+ground plane) that are not part of any mjlab entity. All mjlab entities
+(including fixed-base ones) are auto-wrapped in a mocap body by
+<code>auto_wrap_fixed_base_mocap</code>, which makes them exempt from
+the FK skip. The built-in <code>dr</code> functions target named
+bodies/geoms on entities, so they are always safe.</p>
+<h3 id="how-geom_size-recomputation-works">How <code>geom_size</code>
+recomputation works</h3>
+<p>Changing <code>geom_size</code> at runtime requires updating two
+derived fields that the broadphase reads every step:</p>
+<ul>
+<li><p><code>geom_rbound</code>: bounding sphere radius (used for
+sphere-filter pruning)</p></li>
+<li><p><code>geom_aabb</code>: local axis-aligned bounding box (used for
+AABB/OBB pruning)</p></li>
+</ul>
+<p>Both are copied from <code>MjModel</code> during model loading and
+never recomputed by MuJoCo Warp. <code>dr.geom_size</code> handles this
+by recomputing both fields inline (pure PyTorch, no Warp kernel needed)
+after writing the new sizes.</p>
+<p>The formulas are type-dependent:</p>
+<p>Plane, heightfield, mesh, and SDF geoms are not supported because
+their bounds come from vertex data or are infinite, not derivable from
+<code>geom_size</code>.</p>
+<h3 id="pair_friction-and-isotropic-friction"><code>pair_friction</code>
+and isotropic friction</h3>
+<p><code>pair_friction</code> stores five friction coefficients per
+contact pair:</p>
+<p>MuJoCo’s standard geom friction is a 3-vector
+<code>[tangential, torsional,rolling]</code> that is automatically
+expanded to the 5-vector by replicating the tangential coefficient into
+tangent1 and tangent2, and the rolling coefficient into roll1 and roll2.
+For pair overrides the five values are stored independently, so the
+symmetry must be maintained explicitly. Pass <code>isotropic=True</code>
+to enforce this: after sampling, tangent2 is overwritten with tangent1,
+and roll2 is overwritten with roll1 whenever axes 3 or 4 are
+targeted.</p>
+<p><strong>Recommendations by condim.</strong></p>
+<p><strong>condim = 3.</strong> Both tangent axes are active. Sample
+tangent1 and set tangent2 equal to it with <code>isotropic=True</code>.
+Pass <code>shared_random=True</code> so that all pairs selected by
+<code>asset_cfg</code> receive the same sampled value within each
+environment (environments still get independent values from one
+another):</p>
+<p>dr.pair_friction(env,env_ids=None,ranges=(0.4,
+1.0),operation="abs",asset_cfg=SceneEntityCfg("robot",
+pair_names=("foot1_floor", "foot2_floor")),axes=[0], # sample
+tangent1shared_random=True, # all pairs selected by asset_cfg share one
+value per envisotropic=True, # tangent2 = tangent1)</p>
+<p><strong>condim = 4.</strong> Spin (axis 2) is additionally active.
+Randomize sliding friction as above. If spin should also be randomized,
+do so in a separate call with its own range:</p>
+<p>dr.pair_friction(env,env_ids=None,ranges=(0.4,
+1.0),operation="abs",asset_cfg=SceneEntityCfg("robot",
+pair_names=("foot1_floor",
+"foot2_floor")),axes=[0],shared_random=True,isotropic=True,)dr.pair_friction(env,env_ids=None,ranges=(0.003,
+0.01),operation="abs",asset_cfg=SceneEntityCfg("robot",
+pair_names=("foot1_floor",
+"foot2_floor")),axes=[2],shared_random=True,)</p>
+<p><strong>condim = 6.</strong> All five axes are active. Randomize
+sliding friction as above. To also randomize rolling friction
+symmetrically, target axis 3 with <code>isotropic=True</code> so that
+roll2 is set equal to roll1:</p>
+<p>dr.pair_friction(env,env_ids=None,ranges=(0.4,
+1.0),operation="abs",asset_cfg=SceneEntityCfg("robot",
+pair_names=("foot1_floor",
+"foot2_floor")),axes=[0],shared_random=True,isotropic=True,)dr.pair_friction(env,env_ids=None,ranges=(0.0001,
+0.001),operation="abs",asset_cfg=SceneEntityCfg("robot",
+pair_names=("foot1_floor",
+"foot2_floor")),axes=[3],shared_random=True,isotropic=True, # roll2 =
+roll1)</p>
+<h3 id="fields-without-dr-functions">Fields without <code>dr</code>
+functions</h3>
+<h4 id="added-as-needed">Added as needed</h4>
+<p>These continuous model fields could use a standard <code>dr.*</code>
+function but do not have one yet. They will be added as demand
+arises.</p>
+<h4 id="better-as-custom-code">Better as custom code</h4>
+<p>These fields have coupled semantics that make a generic
+<code>dr.*</code> function more misleading than helpful. For example,
+<code>solref</code> is interpreted differently depending on the solver
+type (elliptic vs. direct), <code>solimp</code> has ordering constraints
+(dmin &lt; dmax, width &gt; 0), and <code>qpos_spring</code> is coupled
+with <code>qpos0</code>. The right ranges depend on the specific
+modeling choices. Write a custom event term instead (see <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/randomization.html#dr-custom-event-terms">Custom
+Class-Based Event Terms</a> or use <code>@requires_model_fields</code>
+to handle field expansion automatically).</p>
+<h4 id="requires-dedicated-api">Requires dedicated API</h4>
+<p>These fields need specialized handling because they are
+integer/categorical, involve vertex data, or lack the per-world
+dimension needed for independent per-environment values.</p>
+<h4 id="not-a-dr-target">Not a DR target</h4>
+<ul>
+<li><p><code>light_active</code>, <code>light_castshadow</code>,
+<code>light_type</code>, <code>cam_projection</code>: boolean/integer
+toggles, not continuous parameters.</p></li>
+<li><p><code>jnt_pos</code>, <code>jnt_axis</code>: structural joint
+geometry; changing at runtime is fragile and not a standard use
+case.</p></li>
+<li><p><code>hfield_data</code>, <code>hfield_size</code>: terrain data;
+use the terrain system instead.</p></li>
+</ul>
+<h2 id="parameters">Parameters</h2>
+<p>The model field functions share three parameters that control
+randomization: <code>distribution</code> controls how values are sampled
+from <code>ranges</code>, and <code>operation</code> controls how those
+sampled values are applied to the model field. (Entity-level functions
+like <code>dr.pseudo_inertia</code> and <code>dr.pd_gains</code> have
+their own signatures; see their docstrings for details.)</p>
+<h3 id="distribution">Distribution</h3>
+<p>The <code>distribution</code> parameter controls how random values
+are sampled from the provided <code>ranges</code>. It accepts a built-in
+string or a <code>dr.Distribution</code> instance for custom sampling
+logic.</p>
+<p>To define a custom distribution, create a
+<code>dr.Distribution</code> instance. The <code>sample</code> callable
+receives <code>(lower, upper, shape, device)</code> and returns a
+tensor. For example, a truncated normal that clamps samples to the given
+bounds:</p>
+<p>import torchfrom mjlab.envs.mdp import drtruncated_normal =
+dr.Distribution(name="truncated_normal",sample=lambda lo, hi, shape,
+device: torch.clamp(torch.normal(mean=(lo + hi) / 2,std=(hi - lo) / 4, #
+95% of samples within
+bounds).expand(shape),min=lo,max=hi,),)params={"distribution":
+truncated_normal, "ranges": (0.3, 1.2)}</p>
+<h3 id="operation">Operation</h3>
+<p>The <code>operation</code> parameter controls how the sampled value
+is applied to the model field. It accepts a built-in string or a
+<code>dr.Operation</code> instance for custom logic.</p>
+<p>For <code>"scale"</code> and <code>"add"</code>, the DR engine always
+applies the random draw to the <strong>original default values</strong>
+captured from the compiled <code>MjModel</code> on CPU, not the current
+values. This prevents accumulation: scaling friction by 2x three times
+in a row gives 2x the original, not 8x.</p>
+<p>To define a custom operation, create a <code>dr.Operation</code>
+instance. The four fields are:</p>
+<ul>
+<li><p><code>name</code>: a human-readable label for error
+messages.</p></li>
+<li><p><code>initialize</code>: creates the result tensor that gets
+filled axis by axis with sampled values. For example, <code>scale</code>
+starts from ones so that unsampled axes multiply by 1 (no change), while
+<code>add</code> starts from zeros.</p></li>
+<li><p><code>combine</code>: takes
+<code>(base_values, random_values)</code> and returns the final tensor
+written into the model field. For example, <code>scale</code> returns
+<code>base * random</code> and <code>add</code> returns
+<code>base + random</code>.</p></li>
+<li><p><code>uses_defaults</code>: when <code>True</code>, the base
+values are the compile-time defaults (preventing accumulation across
+repeated calls). When <code>False</code>, the base values are the
+current model values.</p></li>
+</ul>
+<p>As an example, the built-in <code>add</code> always adds to the
+<em>default</em> values, so repeated calls reset rather than drift. A
+custom <code>drift</code> operation that adds to the <em>current</em>
+values is useful for <code>mode="interval"</code> events where
+parameters should slowly wander over time:</p>
+<p>import torchfrom mjlab.envs.mdp import drdrift =
+dr.Operation(name="drift",initialize=torch.zeros_like,combine=torch.add,uses_defaults=False,
+# read current values, not defaults)# Friction slowly wanders each
+interval step.friction_drift: EventTermCfg =
+EventTermCfg(mode="interval",interval_range_s=(0.5,
+1.0),func=dr.geom_friction,params={"asset_cfg": SceneEntityCfg("robot",
+geom_names=[".*_foot.*"]),"ranges": (-0.01, 0.01),"operation":
+drift,},)</p>
+<h3 id="axis-selection">Axis selection</h3>
+<p>Many model fields are multi-dimensional. For example,
+<code>geom_friction</code> has three components
+<code>[tangential, torsional, rolling]</code> and <code>body_pos</code>
+has three spatial axes <code>[x, y, z]</code>. Specific axes can be
+targeted using the <code>axes</code> parameter or by passing a dict for
+<code>ranges</code>.</p>
+<p>For <code>geom_friction</code> with <code>condim=3</code> (standard
+frictional contact), only <strong>axis 0 (tangential)</strong> affects
+contact behavior. See the <a
+target="_blank" rel="noopener" href="https://mujoco.readthedocs.io/en/stable/computation/index.html#contact">MuJoCo
+contact documentation</a> for details on condim and friction
+coefficients.</p>
+<h1
+id="tangential-friction-only-this-is-the-default-for-geom_frictionparamsranges-0-0.3-1.2-tangential-torsional-torsional-matters-for-condim-4paramsranges-0-0.5-1.0-1-0.001-0.01-x-and-y-position-with-the-same-rangeparamsaxes-0-1-ranges--0.1-0.1">Tangential
+friction only (this is the default for geom_friction)params={"ranges":
+{0: (0.3, 1.2)}}# Tangential + torsional (torsional matters for condim
+&gt;= 4)params={"ranges": {0: (0.5, 1.0), 1: (0.001, 0.01)}}# X and Y
+position with the same rangeparams={"axes": [0, 1], "ranges": (-0.1,
+0.1)}</h1>
+<h3 id="per-component-string-keyed-ranges">Per-component string-keyed
+ranges</h3>
+<p>Different ranges can be applied to different entities in a single
+call using regex patterns as dict keys:</p>
+<p>dr.joint_damping(env, env_ids,ranges={".*knee.*": (0.5, 1.5),
+".*hip.*": (0.8,
+1.2)},operation="scale",asset_cfg=SceneEntityCfg("robot",
+joint_names=[".*"]),)</p>
+<p>Each pattern is matched against the entity names (joint names, geom
+names, etc.) and the corresponding range is applied to the matching
+components. In this example, knee joints get their damping scaled by
+0.5x to 1.5x while hip joints get a tighter 0.8x to 1.2x range, all in a
+single event term.</p>
+<h2 id="examples">Examples</h2>
+<h3 id="friction-reset">Friction (reset)</h3>
+<p>foot_friction: EventTermCfg =
+EventTermCfg(mode="reset",func=dr.geom_friction,params={"asset_cfg":
+SceneEntityCfg("robot", geom_names=[".*_foot.*"]),"ranges": (0.3,
+1.2),"operation": "abs",},)</p>
+<p>Note</p>
+<p>Give the robot’s collision geoms higher <strong>priority</strong>
+than terrain (geom priority defaults to 0). Then only robot friction.
+MuJoCo will use the higher-priority geom’s friction in (robot, terrain)
+contacts.</p>
+<p>from mjlab.utils.spec_config import CollisionCfgrobot_collision =
+CollisionCfg(geom_names_expr=[".*_foot.*"],priority=1,friction=(0.6,),condim=3,)</p>
+<h3 id="joint-offset-startup">Joint Offset (startup)</h3>
+<p>Randomize default joint positions to simulate joint offset
+calibration errors:</p>
+<p>joint_offset: EventTermCfg =
+EventTermCfg(mode="startup",func=dr.joint_default_pos,params={"asset_cfg":
+SceneEntityCfg("robot", joint_names=[".*"]),"ranges": (-0.01,
+0.01),"operation": "add",},)</p>
+<h3 id="center-of-mass-com-startup">Center of Mass (COM) (startup)</h3>
+<p>com: EventTermCfg =
+EventTermCfg(mode="startup",func=dr.body_com_offset,params={"asset_cfg":
+SceneEntityCfg("robot", body_names=["torso"]),"ranges": {0: (-0.02,
+0.02), 1: (-0.02, 0.02)},"operation": "add",},)</p>
+<h2 id="common-pitfalls">Common Pitfalls</h2>
+<h3 id="dr.body_mass-does-not-scale-inertia"><code>dr.body_mass</code>
+does not scale inertia</h3>
+<p>Scaling mass without scaling inertia is only physically correct when
+modelling a point mass added at the COM (which contributes zero
+rotational inertia). For the common DR use case, simulating
+manufacturing variation or uncertainty in link density, mass and inertia
+should scale together. Use <code>dr.pseudo_inertia()</code> with
+<code>alpha_range</code> instead:</p>
+<h1
+id="wrong-mass-changes-inertia-stays-fixed-physically-inconsistent.eventtermcfgfuncdr.body_mass-paramsranges-0.8-1.2-correct-mass-and-inertia-both-scale-by-e2alpha-uniform-density-change.eventtermcfgfuncdr.pseudo_inertia-paramsalpha_range--0.1-0.1">Wrong:
+mass changes, inertia stays fixed (physically
+inconsistent).EventTermCfg(func=dr.body_mass, params={"ranges": (0.8,
+1.2)})# Correct: mass and inertia both scale by e^{2alpha} (uniform
+density change).EventTermCfg(func=dr.pseudo_inertia,
+params={"alpha_range": (-0.1, 0.1)})</h1>
+<p><code>dr.body_mass</code> emits a <code>UserWarning</code> at runtime
+to flag this.</p>
+<h3 id="quat-ranges-are-in-radians-not-degrees"><code>*_quat</code>
+ranges are in radians, not degrees</h3>
+<p>All quaternion randomization functions (<code>dr.geom_quat()</code>,
+<code>dr.body_quat()</code>, <code>dr.site_quat()</code>,
+<code>dr.cam_quat()</code>) accept roll/pitch/yaw ranges in
+<strong>radians</strong>. Passing degree values silently produces
+rotations roughly 57x larger than intended. There is no runtime
+check.</p>
+<h3
+id="quat-perturbations-are-relative-to-the-default-not-the-current-value"><code>*_quat</code>
+perturbations are relative to the default, not the current value</h3>
+<p>The sampled RPY perturbation is composed with the
+<strong>default</strong> quaternion, not the current one. This is
+consistent with the no-accumulation guarantee of all other
+<code>dr</code> functions, but it means repeated calls do not stack
+rotations. Each call independently samples a new perturbation from the
+default orientation.</p>
+<h3
+id="dr.geom_friction-only-randomizes-tangential-friction-by-default"><code>dr.geom_friction</code>
+only randomizes tangential friction by default</h3>
+<p>The default axis is 0 (tangential friction). Axes 1 (torsional) and 2
+(rolling) only affect contacts with <code>condim &gt;= 4</code>, so the
+default is correct for standard <code>condim=3</code> contacts. If the
+model uses high-dimensional contacts, pass <code>axes=[0, 1, 2]</code>
+explicitly.</p>
+<h3
+id="dr.geom_size-raises-on-non-primitive-geoms"><code>dr.geom_size</code>
+raises on non-primitive geoms</h3>
+<p><code>dr.geom_size()</code> only supports primitive geom types
+(sphere, capsule, ellipsoid, cylinder, box) because broadphase bounds
+for mesh, plane, and heightfield geoms cannot be recomputed
+analytically. Selecting a non-primitive geom raises a
+<code>ValueError</code>. Filter the <code>SceneEntityCfg</code> to
+primitive geoms only:</p>
+<h1
+id="select-only-primitive-geoms-by-name-pattern.geom_cfg-sceneentitycfgrobot-geom_names.sphere.-.box.">Select
+only primitive geoms by name pattern.geom_cfg = SceneEntityCfg("robot",
+geom_names=(".*sphere.*", ".*box.*"))</h1>
+<h2 id="how-it-works-under-the-hood">How It Works Under the Hood</h2>
+<p>Understanding the internals helps when writing custom DR terms or
+debugging unexpected behavior.</p>
+<h3 id="per-world-storage">Per-world storage</h3>
+<p>MuJoCo Warp batches thousands of worlds into a single simulation. To
+save memory, model arrays like <code>geom_friction</code> are stored
+once with shape <code>(1, ngeom, 3)</code> and a <strong>stride of
+0</strong> along the first (world) dimension. GPU kernels index into
+these arrays with <code>worldid % arr.shape[0]</code>. When
+<code>shape[0]</code> is 1, every world reads the same row, so they all
+share identical model parameters.</p>
+<p>On the PyTorch side, mjlab wraps these stride-0 arrays using
+<code>torch.expand</code> so they appear to have shape
+<code>(num_envs, ngeom, 3)</code> while still backed by a single row of
+memory. Indexing with <code>tensor[env_id]</code> makes it look like
+each world has its own data, but writes to any world affect all of them
+because they all point to the same underlying memory.</p>
+<p>To give each world independent values, the underlying Warp array is
+<strong>expanded</strong> from shape <code>(1, N)</code> to
+<code>(num_worlds, N)</code> with real per-world memory and normal
+strides. <code>sim.expand_model_fields()</code> allocates a new array,
+copies the shared data into each world’s row, and replaces the old array
+on the model. After expansion, writes to one world no longer affect
+others and each world can have its own friction, mass, or damping
+values.</p>
+<p>Each <code>dr</code> function declares which fields it needs via the
+<code>@requires_model_fields</code> decorator, and the
+<code>EventManager</code> collects these at startup so expansion happens
+automatically. Custom DR terms that directly modify model arrays must
+ensure those arrays have been expanded. Either decorate the function
+with <code>@requires_model_fields</code> or call
+<code>sim.expand_model_fields()</code> manually.</p>
+<p>Note</p>
+<p>Expanding a field allocates new GPU memory and invalidates any
+captured CUDA graph because the graph holds pointers to the old arrays.
+mjlab recreates the graph automatically after expansion. This is a
+one-time cost at environment startup, not per-episode.</p>
+<h3 id="why-not-just-recompile-the-model">Why not just recompile the
+model?</h3>
+<p>The cleanest way to get per-world variation would be to modify the
+<code>MjSpec</code> for each world, compile each one into its own
+<code>MjModel</code>, and transfer them all to the GPU. That would give
+perfectly consistent derived quantities for free because
+<code>mj_setConst</code> runs during compilation.</p>
+<p>mjlab does not do this for two reasons:</p>
+<ol type="1">
+<li><p><strong>Cost.</strong> Compiling an <code>MjSpec</code> is a CPU
+operation. Doing it once per world on every episode reset would be far
+too slow for thousands of environments.</p></li>
+<li><p><strong>Architecture.</strong> MuJoCo Warp expects a single
+<code>Model</code> shared across all worlds. There is no mechanism to
+load N independent models into one simulation.</p></li>
+</ol>
+<p>Instead, mjlab modifies the expanded arrays in place on the GPU and
+selectively recompute only the derived quantities that depend on what
+changed. This is what the <code>RecomputeLevel</code> system
+handles.</p>
+<h3 id="recomputation-of-derived-fields">Recomputation of derived
+fields</h3>
+<p>Some model fields are <strong>derived</strong> from others. For
+example, <code>body_subtreemass</code> (the total mass of a body and all
+its descendants) depends on <code>body_mass</code>. Changing
+<code>body_mass</code> without updating <code>body_subtreemass</code>,
+the constraint solver will use stale impedance values and the simulation
+will be subtly wrong.</p>
+<p>In C MuJoCo, the solution is to call <a
+target="_blank" rel="noopener" href="https://mujoco.readthedocs.io/en/latest/programming/simulation.html#mjmodel-changes">mj_setConst</a>
+after modifying model parameters at runtime. MuJoCo Warp provides an
+equivalent set of functions (<code>set_const</code>,
+<code>set_const_0</code>, <code>set_const_fixed</code>) that run on the
+GPU and operate on all worlds in parallel. mjlab calls these
+automatically.</p>
+<p>The three recomputation levels, from cheapest to most expensive:</p>
+<p>The built-in <code>dr</code> functions already declare the correct
+level. When the <code>EventManager</code> fires multiple DR terms in a
+single <code>apply()</code> call, it tracks the strongest level among
+them and calls <code>sim.recompute_constants()</code> once at the end.
+Manual calls are unnecessary unless writing custom DR logic.</p>
+<p>Fields that only affect contact or joint behavior directly
+(<code>geom_friction</code>, <code>dof_damping</code>,
+<code>dof_frictionloss</code>, etc.) have no derived quantities and need
+no recomputation.</p>
+<p>Note</p>
+<p>mjlab captures <code>sim.step()</code>, <code>sim.forward()</code>,
+<code>sim.reset()</code>, and <code>sim.sense()</code> as individual
+CUDA graphs for performance. All event manager logic, including
+<code>recompute_constants</code>, runs as regular Python between these
+graph replays, so it will not break graph capture.</p>
+<p>That said, <code>set_const</code> is expensive: it runs forward
+kinematics, the composite rigid body algorithm, and mass matrix
+factorization across all worlds. Calling it every step via an
+<code>interval</code> event would add significant overhead. In practice,
+fields that need recomputation (<code>body_mass</code>,
+<code>body_com_offset</code>, <code>joint_armature</code>, etc.) are
+best randomized with <code>startup</code> or <code>reset</code> modes.
+Fields that need no recomputation (<code>geom_friction</code>,
+<code>dof_damping</code>, etc.) are cheap to randomize at any
+frequency.</p>
+<h2 id="custom-class-based-event-terms">Custom Class-Based Event
+Terms</h2>
+<p>Custom event terms can also use classes instead of functions. This is
+useful for event terms that need to maintain state or perform
+initialization logic:</p>
+<p>class RandomizeTerrainFriction: """Custom event term that randomizes
+terrain friction."""def <strong>init</strong>(self, cfg, env):# Find the
+terrain geom index during initializationself._terrain_idx = Nonefor idx,
+geom in enumerate(env.scene.spec.geoms):if geom.name ==
+"terrain":self._terrain_idx = idxif self._terrain_idx is None:raise
+ValueError("Terrain geom not found in the model.")def
+<strong>call</strong>(self, env, env_ids, ranges): """Called each time
+the event is triggered."""from mjlab.utils.math import
+sample_uniformenv.sim.model.geom_friction[env_ids, self._terrain_idx, 0]
+= (sample_uniform(ranges[0], ranges[1], len(env_ids), env.device))#
+Register in the environment config.terrain_friction: EventTermCfg =
+EventTermCfg(mode="reset",func=RandomizeTerrainFriction,params={"ranges":
+(0.3, 1.2)},)</p>
+<h2 id="visualizing-dr-changes">Visualizing DR Changes</h2>
+<p>Both viewers reflect DR changes, but with different coverage.</p>
+<p><strong>Native viewer</strong></p>
+<p>The native viewer syncs per-world model fields from the GPU to a
+local <code>MjModel</code> before each render. All of MuJoCo’s built-in
+visualization toggles then work correctly against the randomized
+model:</p>
+<ul>
+<li><p>Geom appearance (<code>geom_rgba</code>, <code>geom_size</code>,
+<code>geom_pos</code>, <code>geom_quat</code>)</p></li>
+<li><p>Material color (<code>mat_rgba</code>): tints textured
+surfaces</p></li>
+<li><p>Body and site poses (<code>body_pos</code>,
+<code>body_quat</code>, <code>body_ipos</code>, <code>site_pos</code>,
+<code>site_quat</code>)</p></li>
+<li><p>Inertia (<code>body_inertia</code>, <code>body_iquat</code>,
+<code>body_mass</code>): press <code>I</code> to toggle inertia
+boxes</p></li>
+<li><p>Camera parameters (<code>cam_pos</code>, <code>cam_quat</code>,
+<code>cam_fovy</code>, <code>cam_intrinsic</code>): press <code>Q</code>
+to toggle camera frustums</p></li>
+<li><p>Lights (<code>light_pos</code>, <code>light_dir</code>)</p></li>
+</ul>
+<p><img src="Mjlab6-Ms6pbfVEdof79OxvunDcsmpMn4c.gif" /></p>
+<p>Cube color (dr.geom_rgba), cube size (dr.geom_size), and link 2/3
+orientations (dr.body_quat) randomized each episode reset. Broadphase
+bounds are recomputed automatically after size changes.</p>
+<p><img src="Mjlab6-GMdCbOp4aornWXxS1JYcO8W9n27.gif" /></p>
+<p><code>dr.pseudo_inertia</code> with
+<code>alpha_range=(-0.5, 0.5)</code> on links 2 and 3. The inertia
+ellipsoids resize each episode reset while other links remain
+unchanged.</p>
+<p>Note</p>
+<p><code>cam_fovy</code> has no effect on cameras that use intrinsic
+parameters (<code>sensorsize</code> / <code>focal</code> set in XML).
+This applies to both rendered images and the frustum visualization.
+MuJoCo computes the projection from <code>cam_intrinsic</code> and
+<code>cam_sensorsize</code> instead. Use <code>dr.cam_intrinsic</code>
+to randomize the field of view for such cameras. See the <a
+target="_blank" rel="noopener" href="https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-camera">MuJoCo
+camera documentation</a> for details on how intrinsic parameters
+interact with <code>fovy</code>.</p>
+<p><strong>Viser</strong></p>
+<p>Camera frustums and body poses are always current because viser reads
+world-space positions directly from GPU simulation data
+(<code>cam_xpos</code>, <code>body_xpos</code>) every frame.</p>
+<p>Note</p>
+<p><code>geom_rgba</code> and <code>geom_size</code> DR are
+<strong>not</strong> reflected in viser. Geom colors and sizes are baked
+into the scene’s GLB meshes at construction time. The underlying viser
+API (<code>add_batched_meshes_simple</code>) supports per-instance color
+updates via <code>batched_colors</code>, but this requires routing
+color-only geoms through a different handle type than the current
+<code>add_batched_meshes_trimesh</code> path. Deferred for a future
+update.</p>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——Others（Mjlab Learning - Others） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——Others（Mjlab Learning - Others）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <h1 id="mjlabentity">Mjlab——Entity</h1>
+<p>该目录定义仿真实体（Entity）的核心数据结构与配置，负责统一描述机器人/物体等实体的状态、索引和元信息，是连接底层仿真数据与上层管理逻辑的基础抽象层。</p>
+<ul>
+<li><p>entity.py：定义 EntityIndexing（元素
+ID/地址映射）、EntityCfg（实体构建配置）、EntityArticulationInfoCfg（关节驱动配置）、Entity（实体对象本体）。Entity
+负责从 spec_fn 构建 MuJoCo
+MjSpec、识别关节类型（floating/fixed）、应用编辑器（灯光/相机/材质/碰撞）、挂载
+actuator、写入初始 keyframe，并在运行期提供
+<code>initialize()</code>、<code>reset()</code>、<code>update()</code>、<code>write_*_to_sim()</code>、<code>set_*_target()</code>
+等接口。</p></li>
+<li><p>data.py：定义 EntityData 数据容器及
+<code>compute_velocity_from_cvel()</code> 工具函数，封装对底层
+mjwarp.Data/Model
+的写操作（根状态、关节、外力、控制量、mocap）和大量读属性（root/body/geom/site
+的 pose/vel、joint/tendon
+状态、力/力矩、机体系速度、重力投影、朝向等）。</p></li>
+</ul>
+<h1 id="mjlabsensor">Mjlab——Sensor</h1>
+<p>该目录实现传感器抽象与具体传感器类型（如相机、接触、射线、地形高度等），负责从仿真状态提取结构化观测，并通过统一上下文机制向策略或管理器提供感知数据。</p>
+<ul>
+<li><p>sensor.py：传感器抽象基类与配置基类，定义
+<code>edit_spec()</code>、<code>initialize()</code>、<code>_compute_data()</code>、缓存失效、<code>reset()/update()</code>
+等通用生命周期接口。</p></li>
+<li><p>builtin_sensor.py：MuJoCo 内建传感器封装层，支持按 sensor_type +
+obj/ref 在 MjSpec 中创建或包装已有传感器，并以 sensordata
+切片形式返回张量数据。</p></li>
+<li><p>camera_sensor.py：相机传感器实现，支持新建相机或绑定已有相机，输出
+RGB/Depth/Segmentation，并通过共享 SensorContext 获取渲染结果。</p></li>
+<li><p>contact_sensor.py：接触传感器实现，支持按几何体/刚体/子树正则匹配接触对，输出接触力、法向、距离等字段，并可做接触归约、离地时间统计和历史缓存。</p></li>
+<li><p>raycast_sensor.py：射线传感器实现，提供网格/针孔相机/环形等射线模式，支持多挂载帧、方向对齐、几何组过滤与
+Warp BVH 加速，输出命中距离、法线与命中点。</p></li>
+<li><p>terrain_height_sensor.py：基于 RayCastSensor
+的地形高度特化传感器，计算各帧到地形的垂直间隙（<span
+class="math inline">\(frame_z - hit_z\)</span>），并支持
+min/max/mean/none 聚合。</p></li>
+<li><p>sensor_context.py：传感器共享上下文，集中管理渲染上下文、相机缓冲读取、raycast
+前后处理与上下文重建，是相机与射线传感器的资源协调层。</p></li>
+</ul>
+<h1 id="mjlabterrains">Mjlab——Terrains</h1>
+<p>该目录提供地形系统，包括基础地形配置、高度场/几何地形生成、地形实体封装与采样工具，主要用于构建多样化地形分布以支持鲁棒性训练与泛化评估。</p>
+<ul>
+<li><p>config.py：地形预设工厂与注册中心，定义
+flat、pyramid_stairs、perlin_noise 等常用 preset，并组合出
+ROUGH_TERRAINS_CFG、STAIRS_TERRAINS_CFG 等命名地形集合。</p></li>
+<li><p>terrain_generator.py：地形生成框架核心，定义 SubTerrainCfg
+接口、TerrainGeneratorCfg 和
+TerrainGenerator，负责把多种子地形按随机/课程模式铺成网格、生成地形原点与可选平坦采样点。</p></li>
+<li><p>terrain_entity.py：把地形封装成可放入场景的实体类型，定义
+TerrainEntityCfg/TerrainEntity，负责生成或导入地形、分配
+env_origins、课程难度升级与地形相关辅助 site。</p></li>
+<li><p>utils.py：地形通用工具函数，包含高度图平坦区域搜索
+<code>find_flat_patches_from_heightfield()</code>，以及构建平面/边框几何的
+<code>make_plane()</code>、<code>make_border()</code>。</p></li>
+<li><p>primitive_terrains.py：基于基础几何体（box
+等）的地形实现集合，提供
+<code>BoxFlat</code>、台阶、随机格子、踏石、窄梁、环形等 SubTerrainCfg
+子类，用几何拼装方式生成地形。</p></li>
+<li><p>heightfield_terrains.py：基于 heightfield
+的地形实现集合，提供坡地、随机粗糙、波浪、离散障碍、Perlin 噪声等
+<code>Hf*TerrainCfg</code>，并包含高度着色与噪声生成等逻辑。</p></li>
+</ul>
+<h1 id="mjlabscene">Mjlab——Scene</h1>
+<p>该目录负责场景级组织与描述，用于管理场景配置、场景对象组合以及与仿真世界的装配关系，是把实体、地形和传感器整合成可运行世界的核心入口之一。</p>
+<ul>
+<li><p>scene.py：场景核心实现文件，定义
+SceneCfg（环境数、间距、地形、实体、传感器、spec 回调等配置）与
+Scene（组装 terrain/entities/sensors、合并
+keyframe、编译模型、初始化/重置/更新、写回仿真数据、创建
+SensorContext）。</p></li>
+<li><p>scene.xml：场景基础 XML 模板，提供 MuJoCo
+可视化默认参数（灯光、雾效、离屏分辨率、力/接触可视化缩放、阴影质量、统计均值尺寸等），作为
+Scene 构建时的基础 spec。</p></li>
+</ul>
+<h1 id="mjlabsim">Mjlab——Sim</h1>
+<p>该目录封装底层仿真运行时（以 MuJoCo
+为核心）的配置、数据桥接和仿真控制逻辑，负责推进物理步进、维护仿真状态并向上层模块提供一致的数据访问接口。</p>
+<ul>
+<li><p>sim.py：仿真核心实现文件，定义 MuJoCo
+参数配置与仿真运行器，负责初始化 <code>mjModel/mjData</code> 与 mjwarp
+数据结构、执行 step/forward/reset/sense、管理 CUDA Graph
+捕获、字段扩展与 NaN 守护。</p></li>
+<li><p>sim_data.py：数据桥接层，提供 Warp 数组到 PyTorch
+的零拷贝包装与访问代理，保证在不破坏 CUDA Graph
+地址稳定性的前提下进行张量读写。</p></li>
+<li><p>randomization.py：领域随机化辅助工具，提供按环境复制/扩展模型字段的
+Warp kernel 与函数，用于将模型参数扩展为 per-env
+可独立随机化的形式。</p></li>
+</ul>
+<h1 id="mjlabviewer">Mjlab——Viewer</h1>
+<p>该目录负责可视化与交互查看能力，封装不同查看器后端（本地
+viewer、离屏渲染等）及相关配置，使训练与调试过程可以进行实时观察、回放与渲染输出。</p>
+<ul>
+<li><p>base.py：viewer
+抽象基类与主循环框架，定义播放速率控制、动作队列、暂停/单步/重置等通用交互与状态统计。</p></li>
+<li><p>debug_visualizer.py：跨后端统一的调试绘制接口（箭头、坐标系、球体等）以及空实现，供
+managers/sensors 做可视化。</p></li>
+<li><p>offscreen_renderer.py：离屏渲染器，用于无窗口渲染 RGB
+帧/录像，支持按环境索引取画面并叠加调试几何。</p></li>
+<li><p>viewer_config.py：viewer
+参数配置（相机视角、跟踪原点类型、分辨率、阴影/反射、附加环境显示数量等）。</p></li>
+<li><p>Native</p>
+<ul>
+<li><p>keys.py：键盘按键码常量表，供原生窗口快捷键映射。</p></li>
+<li><p>viewer.py：基于 MuJoCo passive viewer 的本地交互 viewer，实现 GPU
+状态到 CPU 渲染同步、输入处理、奖励曲线绘制与多环境展示。</p></li>
+<li><p>visualizer.py：native 后端的调试几何实现，直接向 MuJoCo
+场景注入箭头/球/圆柱/幽灵模型等。</p></li>
+</ul></li>
+<li><p>Viser</p>
+<ul>
+<li><p>viewer.py：Web 版交互 viewer
+主体，提供控制面板、标签页、环境切换、检查点切换、调试开关与异步更新调度。</p></li>
+<li><p>scene.py：Viser 场景桥接层，把仿真状态与 debug primitive 映射到
+3D Web 场景，管理批量网格与 ghost 可视化。</p></li>
+<li><p>camera_viewer.py：相机图像面板（RGB/Depth/Segmentation）与相机视锥显示。</p></li>
+<li><p>overlays.py：各类 overlay
+协调器（奖励/指标、相机、debug、接触），负责更新时机与 UI
+绑定。</p></li>
+<li><p>reward_bar_panel.py：奖励条形面板，按滑动窗口实时显示各 reward
+term 的正负贡献。</p></li>
+<li><p>term_plotter.py：通用时序曲线绘制器，用于 reward/metric
+项的历史曲线显示与筛选。</p></li>
+</ul></li>
+</ul>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

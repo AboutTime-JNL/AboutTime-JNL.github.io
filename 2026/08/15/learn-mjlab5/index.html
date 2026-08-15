@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——Managers（Mjlab Learning - Managers） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——Managers（Mjlab Learning - Managers）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <p>该目录实现环境中的“管理器体系”，把动作、命令、观测、奖励、终止、事件、课程学习和指标统计等功能模块化拆分并统一调度，从而让环境逻辑具备高可配置性和可组合性</p>
+<h1 id="manager_base.py"><strong>manager_base.py</strong></h1>
+<blockquote>
+<p>所有管理器的基类层，定义
+ManagerTermBaseCfg、ManagerTermBase、ManagerBase 以及通用 term
+解析逻辑（含 SceneEntityCfg 自动解析与类式 term 实例化）</p>
+</blockquote>
+<h1
+id="observation_manager.py"><strong>observation_manager.py</strong></h1>
+<blockquote>
+<p>观测构建层，定义
+ObservationTermCfg、ObservationGroupCfg、ObservationManager；实现观测流水线（计算→噪声→裁剪→缩放→延迟→历史）和分组拼接、NaN
+策略、缓存管理</p>
+</blockquote>
+<h2 id="pipeline">Pipeline</h2>
+<p>Each step, every term in every group passes through the following
+pipeline in order:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">compute → noise → clip → scale → delay → history</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p><strong>compute</strong>: the term function is called. It must
+return a <code>[num_envs, D]</code> tensor.</p></li>
+<li><p><strong>noise</strong>: if <code>enable_corruption=True</code> on
+the group and the term has a <code>noise</code> config, noise is
+applied. Stateless noise (<code>NoiseCfg</code>) is applied directly;
+stateful noise (<code>NoiseModelCfg</code>) is maintained by the manager
+across steps.</p></li>
+<li><p><strong>clip</strong>: if <code>clip=(lo, hi)</code> is set on
+the term, values are clamped to that range.</p></li>
+<li><p><strong>scale</strong>: if <code>scale</code> is set, the output
+is multiplied element-wise. Accepts a scalar, a tuple, or a
+tensor.</p></li>
+<li><p><strong>delay</strong>: if <code>delay_max_lag &gt; 0</code>, the
+term’s output is stored in a ring buffer and a value from an earlier
+step is returned. The lag is sampled uniformly from
+<code>[delay_min_lag, delay_max_lag]</code> in integer steps. A lag of
+zero returns the current observation; a lag of two returns the
+observation from two steps ago.<br />
+By default, each environment samples its own lag independently
+(<code>delay_per_env=True</code>). Additional parameters control
+resampling frequency (<code>delay_update_period</code>), hold
+probability (<code>delay_hold_prob</code>), and phase staggering
+(<code>delay_per_env_phase</code>).</p></li>
+<li><p><strong>history</strong>: if <code>history_length &gt; 0</code>,
+past outputs are stacked. Setting <code>history_length=N</code> stacks
+the N most recent outputs of a term. When
+<code>flatten_history_dim=True</code> (the default), the history
+dimension is folded into the feature dimension, producing a
+<code>[num_envs, N * D]</code> tensor suitable for MLPs. When
+<code>flatten_history_dim=False</code>, the output retains the time
+dimension as <code>[num_envs, N, D]</code>, suitable for RNNs.<br />
+History buffers are cleared on environment reset. The first observation
+after reset is backfilled across all history slots, so the policy
+receives valid data from step zero.<br />
+When <code>flatten_history_dim=True</code> and
+<code>concatenate_terms=True</code>, mjlab uses
+<strong>term-major</strong> ordering: each term’s full history is
+flattened before concatenating across terms.</p></li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Term A (D=<span class="number">4</span>, history=<span class="number">3</span>), Term B (D=<span class="number">2</span>, history=<span class="number">3</span>):</span><br><span class="line">[A_t0, A_t1, A_t2, B_t0, B_t1, B_t2]</span><br><span class="line"> └─ A history ──┘  └─ B history ─┘</span><br></pre></td></tr></table></figure>
+<h2 id="built-in-observation-functions">Built-in observation
+functions</h2>
+<p>The functions below live in <code>mjlab.envs.mdp.observations</code>
+(also re-exported as <code>mjlab.envs.mdp</code>). All return
+<code>[num_envs, D]</code> tensors.</p>
+<p>For <code>builtin_sensor</code> and <code>height_scan</code>, the
+<code>sensor_name</code> parameter must match a sensor registered in the
+scene. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/sensors/index.html#sensors">Sensors</a>
+for how to configure sensors.</p>
+<h1 id="action_manager.py"><strong>action_manager.py</strong></h1>
+<blockquote>
+<p>动作管理层，定义 ActionTermCfg/ActionTerm 抽象和
+ActionManager；负责把策略输出动作向量按 term
+切片、处理并下发到对应实体控制目标</p>
+</blockquote>
+<h2 id="参数">参数</h2>
+<ul>
+<li><p><code>entity_name</code> identifies the scene entity to control.
+<code>actuator_names</code> is a tuple of regex patterns matched against
+actuator (or tendon/site) names to select the controlled
+targets.</p></li>
+<li><p><code>scale</code> multiplies the raw policy output before any
+offset is applied. It accepts a scalar or a dict mapping actuator name
+patterns to per-target values. This keeps policy outputs in a normalized
+range while mapping to physically meaningful units. <code>offset</code>
+is added after scaling; joint action types also provide
+<code>use_default_offset</code>, which automatically loads the entity’s
+default joint positions or velocities as the offset so that a raw output
+of zero produces the default pose.</p></li>
+<li><p><code>clip</code> optionally clamps the processed action (after
+scale and offset) before it reaches the actuator. It accepts a dict
+mapping actuator name patterns to <code>(min, max)</code> tuples,
+resolved the same way as <code>scale</code> and
+<code>offset</code>.</p></li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">JointPositionActionCfg(</span><br><span class="line">    entity_name=<span class="string">&quot;robot&quot;</span>,</span><br><span class="line">    actuator_names=(<span class="string">&quot;.*&quot;</span>,),</span><br><span class="line">    scale=<span class="number">0.5</span>,</span><br><span class="line">    clip=&#123;<span class="string">&quot;.*_hip_.*&quot;</span>: (-<span class="number">1.0</span>, <span class="number">1.0</span>), <span class="string">&quot;.*_knee_.*&quot;</span>: (-<span class="number">0.5</span>, <span class="number">2.0</span>)&#125;,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h2 id="action-types">Action types</h2>
+<h1 id="reward_manager.py"><strong>reward_manager.py</strong></h1>
+<blockquote>
+<p>奖励聚合层，定义 RewardTermCfg 与 RewardManager；对各 reward term
+按权重聚合，支持按 dt 缩放、episode 累计统计和可视化 term 调度</p>
+</blockquote>
+<h2 id="built-in-reward-functions">Built-in reward functions</h2>
+<p>The functions below are available in
+<code>mjlab.envs.mdp.rewards</code> and are shared across tasks.
+Individual tasks also define their own reward functions tailored to the
+task objective (e.g. velocity tracking for locomotion). All reward
+functions return a tensor of shape <code>[num_envs]</code>.</p>
+<h1
+id="termination_manager.py"><strong>termination_manager.py</strong></h1>
+<blockquote>
+<p>终止判定层，定义 TerminationTermCfg 与 TerminationManager；汇总
+timeout/truncation 与 failure termination 条件，输出
+dones/time_outs/terminated</p>
+</blockquote>
+<h2 id="built-in-termination-functions">Built-in termination
+functions</h2>
+<p>The functions below are available in
+<code>mjlab.envs.mdp.terminations</code> and are shared across tasks.
+Individual tasks may define additional termination functions specific to
+their objective. All termination functions return a boolean tensor of
+shape <code>[num_envs]</code>.</p>
+<h1 id="command_manager.py"><strong>command_manager.py</strong></h1>
+<blockquote>
+<p>命令生成层，定义 CommandTermCfg/CommandTerm 与
+CommandManager；负责按时间重采样任务命令（如目标速度/目标位姿）、更新命令状态，并支持调试可视化与
+GUI 交互；另含空实现 NullCommandManager</p>
+</blockquote>
+<p>The <code>generated_commands</code> observation function reads the
+current command tensor by name and passes it to the policy:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ObservationTermCfg(</span><br><span class="line">    func=mdp.generated_commands,</span><br><span class="line">    params=&#123;<span class="string">&quot;command_name&quot;</span>: <span class="string">&quot;twist&quot;</span>&#125;,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>If the environment has no commands, the manager no-ops all operations
+and returns empty tensors. There is no special handling required.</p>
+<h2 id="included-command-terms">Included command terms</h2>
+<p>Each task ships with its own command terms tailored to its
+objective.</p>
+<p>Each term can render debug visualizations in the interactive viewer
+when <code>debug_vis=True</code> is set in the configuration.</p>
+<h1 id="event_manager.py"><strong>event_manager.py</strong></h1>
+<blockquote>
+<p>事件调度层，定义 EventTermCfg、EventManager 与
+requires_model_fields()；支持 <code>startup/reset/interval/step</code>
+四类触发模式，常用于 domain randomization、周期扰动与重计算级别控制</p>
+</blockquote>
+<h2 id="参数-1">参数</h2>
+<p>The <code>mode</code> field on <code>EventTermCfg</code> determines
+when the term fires. The four modes correspond to the timescales of an
+RL training run: once at process startup, once per episode, periodically
+within an episode, and on every environment step.</p>
+<ul>
+<li><p><code>"startup"</code>: Fires once during environment
+initialization, after all managers are constructed. Every environment
+receives the event simultaneously. This mode is intended for parameters
+that should differ across environments but remain fixed for the entire
+training run, such as link masses or joint armatures randomized via the
+<code>dr</code> module.</p></li>
+<li><p><code>"reset"</code>: Fires on every episode reset, for each
+environment being reset. This is the most common mode. State
+initialization (writing the robot back to its default pose) and
+episode-level domain randomization both belong here.<br />
+The optional <code>min_step_count_between_reset</code> field prevents
+the term from firing too frequently when episodes are very short. The
+term is skipped for any environment that has not taken at least that
+many steps since its last trigger. The first invocation always fires
+regardless.</p></li>
+<li><p><code>"interval"</code>: Fires at regular time intervals during
+training, independent of episode boundaries. The trigger frequency is
+controlled by <code>interval_range_s</code>, a <code>(min, max)</code>
+range in seconds. After each trigger the manager samples a new wait time
+uniformly from that range. Each environment has its own independent
+timer by default; setting <code>is_global_time=True</code> synchronizes
+all environments to a single shared timer. Interval events are the
+natural home for mid-episode perturbations such as external pushes or
+drifting model parameters.</p></li>
+<li><p><code>"step"</code>" Fires on every environment step, for all
+environments. This mode is intended for continuous effects that must be
+evaluated each step, such as <code>apply_body_impulse</code> which
+manages its own internal duration and cooldown timers. Because step
+events run every step, they should be lightweight or manage their own
+activation logic internally to avoid unnecessary computation.</p></li>
+</ul>
+<p>As with all manager terms, <code>func</code> points to the callable
+and <code>params</code> holds keyword arguments forwarded to it
+alongside <code>env</code> and <code>env_ids</code>. Any
+<code>SceneEntityCfg</code> values inside <code>params</code> are
+resolved once at manager construction (regex patterns are matched to
+model indices at that point, not on every call). Terms can be plain
+functions or classes; see <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#env-config-term-pattern">Term
+configuration pattern</a> for the general pattern.</p>
+<h2 id="built-in-event-functions">Built-in event functions</h2>
+<p>The functions below are available in
+<code>mjlab.envs.mdp.events</code>.</p>
+<h1
+id="curriculum_manager.py"><strong>curriculum_manager.py</strong></h1>
+<blockquote>
+<p>课程学习管理层，定义 CurriculumTermCfg 与 CurriculumManager；按 env
+状态动态调整训练难度相关参数并维护课程状态，含 NullCurriculumManager
+占位实现</p>
+</blockquote>
+<h2 id="built-in-curriculum-functions">Built-in curriculum
+functions</h2>
+<h2 id="reward-curriculum">Reward curriculum</h2>
+<p><code>reward_curriculum</code> schedules changes to a reward term’s
+weight or keyword arguments as training progresses. Each stage specifies
+a <code>step</code> threshold and an optional <code>weight</code> or
+<code>params</code> update. Stages are evaluated in order, and each one
+whose threshold has been reached is applied.</p>
+<p><strong>Ramping a penalty weight</strong></p>
+<p>A common pattern is to introduce a penalty term at low weight early
+in training and increase it once the policy has learned the basics:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.managers.curriculum_manager <span class="keyword">import</span> CurriculumTermCfg</span><br><span class="line"></span><br><span class="line">curriculum = &#123;</span><br><span class="line">    <span class="string">&quot;joint_vel_hinge_weight&quot;</span>: CurriculumTermCfg(</span><br><span class="line">        func=mdp.reward_curriculum,</span><br><span class="line">        params=&#123;</span><br><span class="line">            <span class="string">&quot;reward_name&quot;</span>: <span class="string">&quot;joint_vel_hinge&quot;</span>,</span><br><span class="line">            <span class="string">&quot;stages&quot;</span>: [</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">0</span>, <span class="string">&quot;weight&quot;</span>: -<span class="number">0.01</span>&#125;,</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">12000</span>, <span class="string">&quot;weight&quot;</span>: -<span class="number">0.1</span>&#125;,</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">24000</span>, <span class="string">&quot;weight&quot;</span>: -<span class="number">1.0</span>&#125;,</span><br><span class="line">            ],</span><br><span class="line">        &#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>Adjusting reward parameters</strong></p>
+<p>You can also change the parameters passed to the reward function. For
+example, tightening a tracking tolerance as training progresses:</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">curriculum = &#123;</span><br><span class="line">    <span class="string">&quot;track_lin_vel_tighten&quot;</span>: CurriculumTermCfg(</span><br><span class="line">        <span class="function"><span class="keyword">func</span>=<span class="title">mdp</span>.<span class="title">reward_curriculum</span>,</span></span><br><span class="line">        params=&#123;</span><br><span class="line">            <span class="string">&quot;reward_name&quot;</span>: <span class="string">&quot;track_linear_velocity&quot;</span>,</span><br><span class="line">            <span class="string">&quot;stages&quot;</span>: [</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">0</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;std&quot;</span>: <span class="number">0.5</span>&#125;&#125;,</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">20000</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;std&quot;</span>: <span class="number">0.3</span>&#125;&#125;,</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">50000</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;std&quot;</span>: <span class="number">0.1</span>&#125;&#125;,</span><br><span class="line">            ],</span><br><span class="line">        &#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>Combining weight and params</strong></p>
+<p>A single stage can update both weight and params at once:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;<span class="string">&quot;step&quot;</span>: <span class="number">24000</span>, <span class="string">&quot;weight&quot;</span>: -<span class="number">1.0</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;max_vel&quot;</span>: <span class="number">1.0</span>&#125;&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="termination-curriculum">Termination curriculum</h2>
+<p><code>termination_curriculum</code> schedules changes to a
+termination term’s parameters as training progresses. This is useful for
+gradually tightening termination conditions once the policy has learned
+basic behaviors.</p>
+<p><strong>Tightening an energy limit</strong></p>
+<p>Start with a permissive energy threshold and reduce it over
+training:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.managers.curriculum_manager <span class="keyword">import</span> CurriculumTermCfg</span><br><span class="line"></span><br><span class="line">curriculum = &#123;</span><br><span class="line">    <span class="string">&quot;energy_threshold&quot;</span>: CurriculumTermCfg(</span><br><span class="line">        func=mdp.termination_curriculum,</span><br><span class="line">        params=&#123;</span><br><span class="line">            <span class="string">&quot;termination_name&quot;</span>: <span class="string">&quot;energy&quot;</span>,</span><br><span class="line">            <span class="string">&quot;stages&quot;</span>: [</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">12000</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;threshold&quot;</span>: <span class="number">1000.0</span>&#125;&#125;,</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">24000</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;threshold&quot;</span>: <span class="number">700.0</span>&#125;&#125;,</span><br><span class="line">                &#123;<span class="string">&quot;step&quot;</span>: <span class="number">36000</span>, <span class="string">&quot;params&quot;</span>: &#123;<span class="string">&quot;threshold&quot;</span>: <span class="number">400.0</span>&#125;&#125;,</span><br><span class="line">            ],</span><br><span class="line">        &#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The <code>time_out</code> field on <code>TerminationTermCfg</code>
+can also be toggled via stages if needed, though this is uncommon in
+practice.</p>
+<h2 id="terrain-curriculum">Terrain curriculum</h2>
+<p>The terrain grid used with procedural terrain is a
+<code>num_rows x num_cols</code> matrix of patches. Columns represent
+terrain type variants; rows represent difficulty levels, with row 0
+being the easiest and row <code>num_rows - 1</code> the hardest. When
+<code>TerrainGeneratorCfg.curriculum=True</code>, each column is
+assigned exactly one terrain type so that difficulty increases
+monotonically along rows.</p>
+<p>At environment construction each environment is assigned a random
+starting row within <code>[0, max_init_terrain_level]</code>. The
+<code>terrain_levels_vel</code> curriculum term promotes or demotes
+environments on each reset based on distance traveled during the
+episode. Environments that reach the maximum level are randomly
+reassigned to any row, maintaining coverage across all difficulty
+levels. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/terrain.html#terrain">Terrain</a>
+for details on configuring the terrain grid itself.</p>
+<h1 id="metrics_manager.py"><strong>metrics_manager.py</strong></h1>
+<blockquote>
+<p>指标统计层，定义 MetricsTermCfg 与
+MetricsManager；累计并汇报训练指标（可选按子步采样），与奖励解耦，仅用于记录和分析；含
+NullMetricsManager</p>
+</blockquote>
+<h2 id="pipeline-1">Pipeline</h2>
+<p>The manager maintains a running sum and a step counter for each
+environment. On every call to <code>compute()</code>:</p>
+<ol type="1">
+<li><p>The step counter increments for all environments.</p></li>
+<li><p>Each term function is called with the current environment
+state.</p></li>
+<li><p>The returned per-environment values are added to the running
+sums.</p></li>
+</ol>
+<p>When an environment resets, the manager reduces each term’s
+accumulated values to a scalar, averages the result across all resetting
+environments, and returns it under the key
+<code>Episode_Metrics/&lt;term_name&gt;</code>. The sums and counters
+are then zeroed for the reset environments.</p>
+<p>The reduction is controlled by the <code>reduce</code> field on
+<code>MetricsTermCfg</code>:</p>
+<ul>
+<li><p><code>"mean"</code> (default): divides the accumulated sum by the
+step count for each environment. Division is per-environment, so
+environments that terminated early are not diluted by longer-running
+ones.</p></li>
+<li><p><code>"last"</code>: reports the value from the final step of the
+episode. This is useful for binary success metrics (such as whether the
+robot is standing) that should not be averaged over time.</p></li>
+</ul>
+<p>These scalars flow through <code>env.extras["log"]</code> into the
+training runner, which writes them to the configured logger. In a
+typical training run they appear as:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Episode_Metrics/base_height</span><br><span class="line">Episode_Metrics/contact_force</span><br></pre></td></tr></table></figure>
+<p>alongside the <code>Episode_Reward/</code> entries produced by the
+reward manager.</p>
+<h1
+id="scene_entity_config.py"><strong>scene_entity_config.py</strong></h1>
+<blockquote>
+<p>实体选择解析层，定义 SceneEntityCfg；支持用名称或 ID 选择
+joint/body/geom/site/actuator 等对象，并在运行前做一致性校验与解析</p>
+</blockquote>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

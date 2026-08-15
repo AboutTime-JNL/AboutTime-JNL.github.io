@@ -10,17 +10,17 @@ from datetime import datetime
 # ============================================================
 
 # 生成的 Markdown 文件名，不带 .md
-markdown_name = 'coordination_motion'
+markdown_name = 'mjlab6'
 
 # 图片名称前缀
 # 例如：XXXX
-image_prefix = '协同规划'
+image_prefix = 'Mjlab6'
 
 # Markdown 存放类别，只允许 'daily' 或 'learn'
 post_type = 'learn'
 
 # Markdown 标题
-title = '双臂协同运动规划（Coordination Motion Planning）'
+title = 'Mjlab学习——Envs（Mjlab Learning - Envs）'
 
 # Hexo categories
 categories = 'learn'

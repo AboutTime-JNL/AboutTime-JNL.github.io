@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>离散力学与变分积分子（Discrete Mechanics and Variational Integrators） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>离散力学与变分积分子（Discrete Mechanics and Variational Integrators）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <ul>
+<li><p>连续到离散的核心：One of the simple, but important ideas in
+discrete mechanics is easiest to say from the Lagrangian point of view.
+Namely, consider a mechanical system with configuration manifold Q. The
+velocity phase space is then T Q and the Lagrangian is a map L : T Q →
+R. In discrete mechanics, the starting point is to replace T Q with Q ×
+Q and we regard, intuitively, two nearby points as being the discrete
+analogue of a velocity vector.</p></li>
+<li><p>约束流形的处理，嵌入线性空间，辅以约束方程：Recall from basic
+geometric mechanics (as in Marsden and Ratiu (1999) for instance) that
+specifying a constraint manifold Q means that one may already have
+specified constraints: for example, Q may already be a submanifold of a
+linear space that is specified by constraints. However, when
+constructing integrators in Section 2.1 we will take Q to be linear,
+although this is only for simplicity. One way of handling a nonlinear Q
+is to embed it within a linear space and use the theory of constrained
+systems: this point of view is developed in Section 3.</p></li>
+<li><p>Finally, we mention that techniques of geometric integration in
+the sense of preserving manifold or Lie group structures, as given in
+Budd and Iserles (1999), Iserles, Munthe-Kaas and Zanna (2000) and
+references therein, presumably could, and probably should, be combined
+with the techniques described herein for a more efficient treatment of
+certain classes of constraints in mechanical systems. Such an enterprise
+is for the future.</p></li>
+</ul>
+<p><img src="离散力学-image.png" /></p>
+<h1 id="一离散变分力学">一、离散变分力学</h1>
+<h2 id="连续拉格朗日力学">1.1 连续拉格朗日力学</h2>
+<h3 id="基本定义">1.1.1 基本定义</h3>
+<ul>
+<li><p><strong>配置流形</strong>：<span
+class="math inline">\(Q\)</span>，系统的位置空间</p></li>
+<li><p><strong>状态空间</strong>：切丛 <span
+class="math inline">\(TQ\)</span>，包含位置和速度信息 <span
+class="math inline">\((q, \dot{q})\)</span></p></li>
+<li><p><strong>拉格朗日函数</strong>：<span class="math inline">\(L: TQ
+\to \mathbb{R}\)</span>，通常为动能减势能</p></li>
+<li><p><strong>路径空间</strong>：<span
+class="math inline">\(\mathcal{C}(Q) = \{q: [0,T] \to Q \mid q \text{ 是
+} C^2 \text{ 曲线}\}\)</span></p></li>
+<li><p><strong>作用量泛函</strong>：<span
+class="math inline">\(\mathfrak{G}(q) = \int_0^T L(q(t), \dot{q}(t)) \,
+dt\)</span></p></li>
+<li><p><strong>切空间</strong>：<span
+class="math inline">\(T_q\mathcal{C}(Q) = \{v_q: [0,T] \to TQ \mid \pi_Q
+\circ v_q = q\}\)</span></p></li>
+<li><p><strong>二阶子流形</strong>：<span class="math inline">\(\ddot{Q}
+= \{w \in T(TQ) \mid T\pi_Q(w) = \pi_{TQ}(w)\} \subset
+T(TQ)\)</span></p></li>
+</ul>
+<h3 id="理论成果">1.1.2 理论成果</h3>
+<h4 id="变分原理与euler-lagrange方程">变分原理与Euler-Lagrange方程</h4>
+<ul>
+<li><p>作用量泛函的微分：<span
+class="math inline">\(\mathbf{d}\mathfrak{G}(q) \cdot \delta q =
+\int_0^T \left[\frac{\partial L}{\partial q^i}\delta q^i +
+\frac{\partial L}{\partial \dot{q}^i}\frac{d}{dt}\delta q^i\right]
+dt\)</span><br />
+通过分部积分得到：<span class="math inline">\(\mathbf{d}\mathfrak{G}(q)
+\cdot \delta q = \int_0^T \left[\frac{\partial L}{\partial q^i} -
+\frac{d}{dt}\frac{\partial L}{\partial \dot{q}^i}\right] \cdot \delta
+q^i dt + \left[\frac{\partial L}{\partial \dot{q}^i}\delta
+q^i\right]_0^T\)</span><br />
+对于固定端点的变分 <span class="math inline">\((\delta q(0) = \delta
+q(T) = 0)\)</span>，给出Euler-Lagrange方程<span
+class="math inline">\(\frac{\partial L}{\partial q^i}(q,\dot{q}) -
+\frac{d}{dt}\left(\frac{\partial L}{\partial
+\dot{q}^i}(q,\dot{q})\right) = 0\)</span></p></li>
+<li><p><strong>Euler-Lagrange映射</strong>：<span
+class="math inline">\(D_{\mathrm{EL}}L: \ddot{Q} \to T^*Q=\frac{\partial
+L}{\partial q^i} - \frac{d}{dt}\frac{\partial L}{\partial
+\dot{q}^i}\)</span></p></li>
+<li><p><strong>拉格朗日1-形式（动量形式）</strong>：<span
+class="math inline">\(\Theta_L = \frac{\partial L}{\partial
+\dot{q}^i}\mathbf{d}q^i\)</span></p></li>
+</ul>
+<h4 id="拉格朗日向量场与流">拉格朗日向量场与流</h4>
+<ul>
+<li><p><strong>拉格朗日向量场</strong>：<span class="math inline">\(X_L:
+TQ \to T(TQ)\)</span>，满足<span class="math inline">\(D_{\mathrm{EL}}L
+\circ X_L = 0\)</span></p>
+<ul>
+<li>曲线 <span class="math inline">\(q \in \mathcal{C}(Q)\)</span> 是
+Euler-Lagrange 方程的解当且仅当 <span
+class="math inline">\((q,\dot{q})\)</span> 是 <span
+class="math inline">\(X_L\)</span> 的积分曲线</li>
+</ul></li>
+<li><p><strong>拉格朗日流</strong>：<span class="math inline">\(F_L: TQ
+\times \mathbb{R} \to TQ\)</span>，<span
+class="math inline">\(X_L\)</span> 的流</p></li>
+</ul>
+<h4 id="拉格朗日流的辛性">拉格朗日流的辛性</h4>
+<ul>
+<li><p><strong>限制作用量</strong>：<span
+class="math inline">\(\tilde{\mathfrak{G}}: TQ \to
+\mathbb{R}\)</span>，满足Euler-Lagrange方程的运动对应的作用量，仅为初始状态的函数</p></li>
+<li><p>对限制作用量进行一次外微分，可以发现其只和拉格朗日1-形式相关<br />
+再进行一次外微分，可以得到<strong>拉格朗日2-形式（辛形式）</strong>：<span
+class="math inline">\(\Omega_L = \mathbf{d}\Theta_L\)</span></p></li>
+<li><p>利用外微分算子的性质，证明拉格朗日流保持辛形式：<span
+class="math inline">\((F_L^T)^*(\Omega_L) = \Omega_L\)</span></p></li>
+<li><p>辛形式坐标表达式：<span class="math inline">\(\Omega_L(q,\dot{q})
+= \frac{\partial^2 L}{\partial q^i\partial \dot{q}^j}\mathbf{d}q^i
+\wedge \mathbf{d}q^j + \frac{\partial^2 L}{\partial \dot{q}^i\partial
+\dot{q}^j}\mathbf{d}\dot{q}^i \wedge \mathbf{d}q^j\)</span></p></li>
+</ul>
+<h4
+id="拉格朗日流的等变性与守恒律连续对称性">拉格朗日流的等变性与守恒律（连续对称性）</h4>
+<ul>
+<li><p><strong>群变换</strong>：<span class="math inline">\(\Phi: G
+\times Q \to Q\)</span>，李群 <span class="math inline">\(G\)</span> 在
+<span class="math inline">\(Q\)</span> 上的作用</p></li>
+<li><p><strong>切提升</strong>：<span class="math inline">\(\Phi^{TQ}: G
+\times TQ \to TQ\)</span></p></li>
+<li><p><strong>无穷小生成元（群变换对应的向量场）</strong>：<span
+class="math inline">\(\xi_Q: Q \to TQ\)</span>，<span
+class="math inline">\(\xi_{TQ}: TQ \to T(TQ)\)</span></p></li>
+<li><p><strong>拉格朗日动量映射</strong>：<span
+class="math inline">\(J_L(v_q) \cdot \xi = \Theta_L \cdot \xi_{TQ}(v_q)
+= \left\langle \frac{\partial L}{\partial \dot{q}}, \xi_Q(q)
+\right\rangle\)</span>（类似于雅可比速度变换）</p></li>
+<li><p><strong>等变性条件（动量计算与李群变换可以交换）</strong>：当提升作用保持拉格朗日1-形式时：<span
+class="math inline">\((\Phi_g^{TQ})^*\Theta_L = \Theta_L \quad
+\Rightarrow \quad J_L \circ \Phi_g^{TQ} = \mathrm{Ad}_{g^{-1}}^* \circ
+J_L\)</span></p></li>
+<li><p><strong>Noether定理</strong>：如果拉格朗日函数在群作用下不变：<span
+class="math inline">\(L \circ \Phi_g^{TQ} = L \quad \text{对所有 } g \in
+G\)</span>，则相应的动量映射守恒：<span class="math inline">\(J_L \circ
+F_L^t = J_L \quad \text{对所有时间 } t\)</span></p></li>
+</ul>
+<h2 id="离散拉格朗日力学">1.2 离散拉格朗日力学</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>连续力学</th>
+<th>离散力学</th>
+<th>数学对应</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>状态空间 <span class="math inline">\(TQ\)</span></td>
+<td>离散状态空间 <span class="math inline">\(Q \times Q\)</span></td>
+<td>切丛→笛卡尔积</td>
+</tr>
+<tr class="even">
+<td>拉格朗日量 <span class="math inline">\(L(q,\dot{q})\)</span></td>
+<td>离散拉格朗日量 <span
+class="math inline">\(L_d(q_0,q_1,h)\)</span></td>
+<td>函数→两点函数</td>
+</tr>
+<tr class="odd">
+<td>作用量 <span class="math inline">\(\int L dt\)</span></td>
+<td>离散作用量 <span class="math inline">\(\sum L_d\)</span></td>
+<td>积分→求和</td>
+</tr>
+<tr class="even">
+<td>变分原理 <span class="math inline">\(\delta \int L dt =
+0\)</span></td>
+<td>离散变分原理 <span class="math inline">\(\delta \sum L_d =
+0\)</span></td>
+<td>连续变分→离散变分</td>
+</tr>
+</tbody>
+</table>
+<h3 id="基本定义-1">1.2.1 基本定义</h3>
+<ul>
+<li><p><strong>配置流形</strong>：<span
+class="math inline">\(Q\)</span></p></li>
+<li><p><strong>离散状态空间</strong>：<span class="math inline">\(Q
+\times Q\)</span>，直观理解为"两个相邻时刻的位置"</p></li>
+<li><p><strong>离散路径空间</strong>：<span
+class="math inline">\(\mathcal{C}_d(Q) = \{q_d: \{t_k\} \to Q\} \cong
+Q^{N+1}\)</span></p></li>
+<li><p><strong>离散作用量</strong>：<span
+class="math inline">\(\mathfrak{G}_d(q_d) = \sum_{k=0}^{N-1} L_d(q_k,
+q_{k+1})\)</span></p></li>
+<li><p><strong>离散演化算子</strong>：<span
+class="math inline">\(X_{L_d}: Q\times Q \to (Q\times Q) \times (Q\times
+Q)\)</span></p></li>
+<li><p><strong>离散映射</strong>：<span class="math inline">\(F_{L_d} =
+\sigma \circ X_{L_d}\)</span></p></li>
+<li><p><strong>二阶性条件</strong>：保证形式 <span
+class="math inline">\((q_0,q_1) \mapsto (q_1,q_2)\)</span></p></li>
+</ul>
+<h3 id="理论成果-1">1.2.2 理论成果</h3>
+<h4
+id="离散变分原理与离散euler-lagrange方程"><strong>离散变分原理与离散Euler-Lagrange方程</strong></h4>
+<ul>
+<li><p>离散变分原理：在固定端点 <span class="math inline">\(q_0,
+q_N\)</span> 条件下，真实轨迹使 <span
+class="math inline">\(\mathfrak{G}_d\)</span>
+取驻值。通过离散变分计算得到：<span
+class="math inline">\(\mathbf{d}\mathfrak{G}_d(q_d) \cdot \delta q_d =
+\sum_{k=1}^{N-1} D_{\mathrm{DEL}}L_d \cdot \delta q_k +
+\text{边界项}\)</span></p></li>
+<li><p><strong>离散Euler-Lagrange映射</strong>：<span
+class="math inline">\(D_{\mathrm{DEL}}L_d((q_{k-1},q_k),(q_k,q_{k+1})) =
+D_2L_d(q_{k-1},q_k) + D_1L_d(q_k,q_{k+1})\)</span></p></li>
+<li><p><strong>离散拉格朗日1-形式</strong>：<span
+class="math inline">\(\Theta_{L_d}^+ = D_2L_d \mathbf{d}q_1, \quad
+\Theta_{L_d}^- = -D_1L_d \mathbf{d}q_0\)</span><br />
+两个1-形式的关系：虽然有两个离散1-形式 <span
+class="math inline">\(\Theta_{L_d}^+\)</span> 和 <span
+class="math inline">\(\Theta_{L_d}^-\)</span>，但满足：<span
+class="math inline">\(\mathbf{d}L_d = \Theta_{L_d}^+ - \Theta_{L_d}^-
+\quad \Rightarrow \quad \mathbf{d}\Theta_{L_d}^+ =
+\mathbf{d}\Theta_{L_d}^-\)</span>，这保证了只有一个离散辛形式 <span
+class="math inline">\(\Omega_{L_d}\)</span></p></li>
+<li><p><strong>离散Euler-Lagrange方程</strong>：<span
+class="math inline">\(D_2L_d(q_{k-1},q_k) + D_1L_d(q_k,q_{k+1}) =
+0\)</span></p></li>
+<li><p><strong>离散拉格朗日流：</strong><span
+class="math inline">\(F_{L_d}: (q_{k-1},q_k) \mapsto
+(q_k,q_{k+1})\)</span></p></li>
+</ul>
+<h4 id="离散拉格朗日流的辛性">离散拉格朗日流的辛性</h4>
+<ul>
+<li><p>从离散作用量的二阶微分得到：<span
+class="math inline">\(\mathbf{d}^2\hat{\mathfrak{G}}_d = 0 \quad
+\Rightarrow \quad (F_{L_d})^*\Omega_{L_d} =
+\Omega_{L_d}\)</span></p></li>
+<li><p><strong>离散辛形式</strong>：<span
+class="math inline">\(\Omega_{L_d} = \mathbf{d}\Theta_{L_d}^+ =
+\mathbf{d}\Theta_{L_d}^- = \frac{\partial^2 L_d}{\partial q_0^i \partial
+q_1^j} \mathbf{d}q_0^i \wedge \mathbf{d}q_1^j\)</span></p></li>
+</ul>
+<h4
+id="离散拉格朗日流的等变性与守恒律">离散拉格朗日流的等变性与守恒律</h4>
+<ul>
+<li><p>李群作用 <span class="math inline">\(\Phi: G \times Q \to
+Q\)</span></p></li>
+<li><p><strong>离散动量映射</strong>：<span
+class="math inline">\(\begin{aligned}
+J_{L_d}^+(q_0,q_1) \cdot \xi &amp;= \langle D_2L_d(q_0,q_1), \xi_Q(q_1)
+\rangle \\
+J_{L_d}^-(q_0,q_1) \cdot \xi &amp;= \langle -D_1L_d(q_0,q_1), \xi_Q(q_0)
+\rangle
+\end{aligned}\)</span></p></li>
+<li><p><strong>离散Noether定理</strong>：如果离散拉格朗日量在群作用下不变：<span
+class="math inline">\(L_d \circ \Phi_g^{Q\times Q} =
+L_d\)</span>，则离散动量映射守恒：<span class="math inline">\(J_{L_d}
+\circ F_{L_d} = J_{L_d}\)</span></p></li>
+</ul>
+<h2 id="连续哈密顿力学">1.3 连续哈密顿力学</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>拉格朗日框架</th>
+<th>哈密顿框架</th>
+<th>转换关系</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>状态空间 <span class="math inline">\(TQ\)</span></td>
+<td>相空间 <span class="math inline">\(T^*Q\)</span></td>
+<td>勒让德变换 <span class="math inline">\(\mathbb{F}L\)</span></td>
+</tr>
+<tr class="even">
+<td>拉格朗日量 <span class="math inline">\(L(q,\dot{q})\)</span></td>
+<td>哈密顿量 <span class="math inline">\(H(q,p)\)</span></td>
+<td><span class="math inline">\(H = p\dot{q} - L\)</span></td>
+</tr>
+<tr class="odd">
+<td>Euler-Lagrange方程</td>
+<td>Hamilton方程</td>
+<td>通过勒让德变换等价</td>
+</tr>
+<tr class="even">
+<td>拉格朗日辛形式 <span class="math inline">\(\Omega_L\)</span></td>
+<td>典范辛形式 <span class="math inline">\(\Omega\)</span></td>
+<td><span class="math inline">\(\Omega_L =
+(\mathbb{F}L)^*\Omega\)</span></td>
+</tr>
+</tbody>
+</table>
+<h3 id="基本定义-2">1.3.1 基本定义</h3>
+<ul>
+<li><p><strong>配置流形</strong>：<span
+class="math inline">\(Q\)</span></p></li>
+<li><p><strong>相空间</strong>：余切丛 <span
+class="math inline">\(T^*Q\)</span></p></li>
+<li><p><strong>典范1-形式（动量形式）</strong>：<span
+class="math inline">\(\Theta_{p_q}(u_{p_q}) = \langle p_q,
+T\pi_{T^*Q}(u_{p_q}) \rangle\)</span>，<span
+class="math inline">\(\Theta = p_i\mathbf{d}q^i\)</span></p></li>
+<li><p><strong>典范2-形式（辛形式）</strong>：<span
+class="math inline">\(\Omega = -\mathbf{d}\Theta = \mathbf{d}q^i \wedge
+\mathbf{d}p_i\)</span></p></li>
+</ul>
+<h3 id="理论成果-2">1.3.2 理论成果</h3>
+<h4 id="哈密顿向量场与流">哈密顿向量场与流</h4>
+<ul>
+<li><p><strong>哈密顿向量场</strong> <span
+class="math inline">\(X_H\)</span> 由下式唯一确定：<span
+class="math inline">\(\mathbf{i}_{X_H}\Omega =
+\mathbf{d}H\)</span>，<span
+class="math inline">\(\mathbf{i}_{X_H}\Omega(V) = \Omega(X_H,
+V)\)</span></p></li>
+<li><p><strong>哈密顿方程</strong>（坐标形式）：<span
+class="math inline">\(\dot{q}^i = \frac{\partial H}{\partial p_i}, \quad
+\dot{p}_i = -\frac{\partial H}{\partial q^i}\)</span></p></li>
+<li><p><strong>哈密顿流</strong> <span
+class="math inline">\(F_H^t\)</span> 自动保持辛结构：<span
+class="math inline">\((F_H^t)^*\Omega = \Omega\)</span></p></li>
+</ul>
+<h4 id="哈密顿流的等变性与守恒律">哈密顿流的等变性与守恒律</h4>
+<ul>
+<li><p><strong>余切提升</strong>：群作用 <span
+class="math inline">\(\Phi: G \times Q \to Q\)</span> 提升到 <span
+class="math inline">\(\Phi^{T^*Q}: G \times T^*Q \to
+T^*Q\)</span>，<span class="math inline">\(\Phi_g^{T^*Q}(p_q) =
+\Phi_{g^{-1}}^*(p_q)\)</span></p></li>
+<li><p><strong>哈密顿动量映射</strong>：<span
+class="math inline">\(J_H(p_q) \cdot \xi = \Theta(p_q) \cdot
+\xi_{T^*Q}(p_q) = \langle p_q, \xi_Q(q) \rangle\)</span></p></li>
+<li><p>余切提升自动保持典范1-形式：<span
+class="math inline">\((\Phi_g^{T^*Q})^*\Theta =
+\Theta\)</span>，哈密顿动量映射 <span class="math inline">\(J_H\)</span>
+总是等变的</p></li>
+<li><p><strong>哈密顿Noether定理</strong>：如果 <span
+class="math inline">\(H\)</span> 在群作用下不变，则 <span
+class="math inline">\(J_H\)</span> 沿哈密顿流守恒</p></li>
+</ul>
+<h4 id="勒让德变换">勒让德变换</h4>
+<ul>
+<li><p><strong>拉格朗日→哈密顿</strong>：<span
+class="math inline">\(\mathbb{F}L: TQ \to T^*Q, \quad (q,\dot{q})
+\mapsto \left(q, \frac{\partial
+L}{\partial\dot{q}}(q,\dot{q})\right)\)</span></p></li>
+<li><p><strong>哈密顿→拉格朗日</strong>：<span
+class="math inline">\(\mathbb{F}H: T^*Q \to TQ, \quad (q,p) \mapsto
+\left(q, \frac{\partial H}{\partial p}(q,p)\right)\)</span></p></li>
+<li><p>哈密顿力学中，哈密顿向量场对于任意哈密顿量都是完全定义的，一定存在；<br />
+拉格朗日力学中，拉格朗日向量场存在且唯一的条件为拉格朗日是正则的</p></li>
+<li><p><strong>正则</strong>：<span
+class="math inline">\(\mathbb{F}L\)</span> 是局部微分同胚（坐标表达为
+<span class="math inline">\(D_2D_2L\)</span>
+可逆）；<strong>超正则</strong>：<span
+class="math inline">\(\mathbb{F}L\)</span> 是全局微分同胚</p></li>
+<li><p>在正则条件下， <span class="math inline">\(L\)</span> 和 <span
+class="math inline">\(H\)</span> 通过勒让德变换相关：<span
+class="math inline">\(H(q,p) = \mathbb{F}L(q,\dot{q}) \cdot \dot{q} -
+L(q,\dot{q})\)</span></p>
+<p>则有：<span class="math inline">\(\begin{aligned}
+X_L &amp;= (\mathbb{F}L)^*X_H,&amp;\Omega_L &amp;=
+(\mathbb{F}L)^*\Omega\\
+J_L &amp;= (\mathbb{F}L)^*J_H,&amp;F_L^t &amp;= (\mathbb{F}L)^{-1} \circ
+F_H^t \circ \mathbb{F}L
+\end{aligned}\)</span></p></li>
+</ul>
+<h4 id="生成函数">生成函数</h4>
+<ul>
+<li><p>每一个辛变换<span class="math inline">\(F: T^*Q \to
+T^*Q\)</span>都可以由一个生成函数刻画。考虑图的拉格朗日子流形 <span
+class="math inline">\(\Gamma(F) \subset T^*Q \times
+T^*Q\)</span>，定义1-形式 <span class="math inline">\(\hat{\Theta} =
+\pi_2^*\Theta - \pi_1^*\Theta\)</span>，局部存在 <span
+class="math inline">\(S: \Gamma(F) \to \mathbb{R}\)</span> 使得：<span
+class="math inline">\(i_F^*\hat{\Theta} = \mathbf{d}S\)</span></p></li>
+<li><p>第一类生成函数</p>
+<ul>
+<li><p><strong>坐标选择</strong>：以 <span class="math inline">\((q_0,
+q_1)\)</span> 为自变量</p></li>
+<li><p><strong>变换关系</strong>：<span class="math inline">\(p_0 =
+-D_1S(q_0, q_1), \quad p_1 = D_2S(q_0, q_1)\)</span></p></li>
+<li><p><strong>存在性条件</strong>：需要保证从 <span
+class="math inline">\((q_0, p_0)\)</span> 到 <span
+class="math inline">\((q_1, p_1)\)</span> 的映射是良定义的</p></li>
+</ul></li>
+</ul>
+<h2 id="离散哈密顿力学">1.4 离散哈密顿力学</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>方面</th>
+<th>连续力学 (1.4章)</th>
+<th>离散力学 (1.5章)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>状态空间</strong></td>
+<td><span class="math inline">\(TQ\)</span> 或 <span
+class="math inline">\(T^*Q\)</span></td>
+<td><span class="math inline">\(Q \times Q\)</span></td>
+</tr>
+<tr class="even">
+<td><strong>勒让德变换</strong></td>
+<td><span class="math inline">\(\mathbb{F}L: TQ \to T^*Q\)</span></td>
+<td><span class="math inline">\(\mathbb{F}^{\pm}L_d: Q\times Q \to
+T^*Q\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong>生成函数</strong></td>
+<td>任意辛变换 <span class="math inline">\(F\)</span> 有生成函数 <span
+class="math inline">\(S\)</span></td>
+<td>离散拉格朗日 <span class="math inline">\(L_d\)</span>
+自身就是生成函数</td>
+</tr>
+<tr class="even">
+<td><strong>核心方程</strong></td>
+<td>哈密顿方程 <span class="math inline">\(\dot{q} = \partial H/\partial
+p\)</span> 等</td>
+<td>离散哈密顿映射方程 <span class="math inline">\(p_0 = -D_1
+L_d\)</span> 等</td>
+</tr>
+<tr class="odd">
+<td><strong>几何性质</strong></td>
+<td>哈密顿流保持 <span class="math inline">\(\Omega\)</span></td>
+<td>离散哈密顿映射保持 <span class="math inline">\(\Omega\)</span></td>
+</tr>
+</tbody>
+</table>
+<h3 id="基本定义-3">1.4.1 基本定义</h3>
+<ul>
+<li><p><strong>离散状态空间</strong>：<span class="math inline">\(Q
+\times Q\)</span></p></li>
+<li><p><strong>离散纤维导数</strong>：<span
+class="math inline">\(\begin{aligned}
+\mathbb{F}^+L_d: (q_0, q_1) \mapsto (q_1, p_1) &amp;= (q_1, D_2 L_d(q_0,
+q_1))\\
+\mathbb{F}^-L_d: (q_0, q_1) \mapsto (q_0, p_0) &amp;= (q_0, -D_1
+L_d(q_0, q_1))
+\end{aligned}\)</span></p></li>
+<li><p><strong>正则性</strong>：<span
+class="math inline">\(\mathbb{F}^+L_d\)</span> 和 <span
+class="math inline">\(\mathbb{F}^-L_d\)</span> 都是局部同构时，称 <span
+class="math inline">\(L_d\)</span>
+是正则的；若为全局同构，则称超正则的</p></li>
+</ul>
+<h3 id="理论成果-3">1.4.2 理论成果</h3>
+<h4 id="离散哈密顿映射"><strong>离散哈密顿映射</strong></h4>
+<ul>
+<li><p><strong>离散哈密顿映射</strong>：<span
+class="math inline">\(\tilde{F}_{L_d} = \mathbb{F}^{\pm}L_d \circ
+F_{L_d} \circ (\mathbb{F}^{\pm}L_d)^{-1}\)</span>,<span
+class="math inline">\(\tilde{F}_{L_d} = \mathbb{F}^+L_d \circ
+(\mathbb{F}^-L_d)^{-1}\)</span></p></li>
+<li><p><strong>坐标表达</strong>：<span
+class="math inline">\(\tilde{F}_{L_d}: (q_0, p_0) \mapsto (q_1,
+p_1)\)</span> ，由下式隐式定义：<span class="math inline">\(p_0 = -D_1
+L_d(q_0, q_1), \quad p_1 = D_2 L_d(q_0, q_1)\)</span></p></li>
+<li><p>离散拉格朗日函数 <span class="math inline">\(L_d(q_0,
+q_1)\)</span> 就是离散哈密顿映射 <span
+class="math inline">\(\tilde{F}_{L_d}\)</span> 的第一类生成函数</p></li>
+<li><p><strong>区间动量</strong>：定义 <span
+class="math inline">\(p_{k,k+1}^+ = \mathbb{F}^+L_d(q_k,
+q_{k+1})\)</span>，<span class="math inline">\(p_{k,k+1}^- =
+\mathbb{F}^-L_d(q_k, q_{k+1})\)</span></p></li>
+<li><p><strong>动量匹配</strong>：离散欧拉-拉格朗日方程等价于 <span
+class="math inline">\(p_{k-1,k}^+ = p_{k,k+1}^-\)</span></p></li>
+</ul>
+<h4
+id="离散哈密顿映射的辛性与守恒律"><strong>离散哈密顿映射的辛性与守恒律</strong></h4>
+<ul>
+<li><p><strong>辛性</strong>：<span
+class="math inline">\(\tilde{F}_{L_d}\)</span> 保持典范辛形式：<span
+class="math inline">\(\tilde{F}_{L_d}^*\Omega = \Omega\)</span></p></li>
+<li><p><strong>动量映射保持</strong>：离散动量映射通过离散勒让德变换与哈密顿动量映射相联系：<span
+class="math inline">\(J_{L_d}^{\pm} =
+(\mathbb{F}^{\pm}L_d)^*J_H\)</span></p></li>
+<li><p><strong>离散Noether定理</strong>：若 <span
+class="math inline">\(L_d\)</span> 在群作用下不变，则离散动量映射 <span
+class="math inline">\(J_{L_d}\)</span> 在离散哈密顿映射下守恒</p></li>
+</ul>
+<h4 id="与连续系统的关系"><strong>与连续系统的关系</strong></h4>
+<ul>
+<li><p><strong>精确离散拉格朗日量：</strong><span
+class="math inline">\(L_d^E(q_0, q_1, h) = \int_0^h L(q_{0,1}(t),
+\dot{q}_{0,1}(t)) \, dt\)</span></p>
+<ul>
+<li><p>离散欧拉-拉格朗日方程的解 <span
+class="math inline">\(\{q_k\}\)</span>恰好是连续欧拉-拉格朗日方程的解在离散时间点上的采样：<span
+class="math inline">\(q_k = q(t_k)\)</span></p></li>
+<li><p><strong>离散哈密顿映射</strong><span
+class="math inline">\(\tilde{F}_{L_d^E}\)</span>精确等于连续哈密顿流<span
+class="math inline">\(F_H^h\)</span>：<span
+class="math inline">\(\tilde{F}_{L_d^E} = F_H^h\)</span></p></li>
+</ul></li>
+<li><p><strong>几何结构对应</strong>：<span
+class="math inline">\(\Theta_{L_d}^{\pm} =
+(\mathbb{F}^{\pm}L_d)^*\Theta,\enspace \Omega_{L_d} =
+(\mathbb{F}^{\pm}L_d)^*\Omega,\enspace
+J_{L_d}^{\pm} = (\mathbb{F}^{\pm}L_d)^*J_H\)</span></p></li>
+</ul>
+<h2 id="哈密顿-雅可比理论">1.5 哈密顿-雅可比理论</h2>
+<h3 id="基本定义-4">1.5.1 基本定义</h3>
+<ul>
+<li><p><strong>扩展相空间</strong>：<span class="math inline">\(T^*Q
+\times \mathbb{R}\)</span>，包含时间变量</p></li>
+<li><p><strong>扩展典范1-形式</strong>：<span
+class="math inline">\(\Theta_H = i_{T^*Q}^* \Theta - i_{T^*Q}^* H \wedge
+\mathbf{d}t\)</span></p></li>
+<li><p><strong>扩展典范2-形式（辛形式）</strong>：<span
+class="math inline">\(\Omega_H = -\mathbf{d}\Theta_H = i_{T^*Q}^* \Omega
+- i_{T^*Q}^* \mathbf{d}H \wedge \mathbf{d}t\)</span></p></li>
+</ul>
+<h3 id="理论成果-4">1.5.2 理论成果</h3>
+<h4 id="哈密顿-雅可比方程"><strong>哈密顿-雅可比方程</strong></h4>
+<ul>
+<li><p>选择 <span class="math inline">\((q_0, q_1, t)\)</span>
+作为坐标，生成函数条件给出：<span class="math inline">\(\begin{aligned}
+p_0 &amp;= -\frac{\partial S}{\partial q_0}(q_0, q_1, t) \\
+p_1 &amp;= \frac{\partial S}{\partial q_1}(q_0, q_1, t) \\
+H\left(q_1, \frac{\partial S}{\partial q_1}(q_0, q_1, t)\right) &amp;=
+\frac{\partial S}{\partial t}(q_0, q_1, t)
+\end{aligned}\)</span></p></li>
+<li><p>最后一个等式称为哈密顿-雅可比方程：生成函数 <span
+class="math inline">\(S: Q \times Q \times \mathbb{R} \to
+\mathbb{R}\)</span> 满足的偏微分方程：<span
+class="math inline">\(\frac{\partial S}{\partial t} + H\left(q,
+\frac{\partial S}{\partial q}\right) = 0\)</span></p></li>
+<li><p><strong>边界条件</strong>：需要指定 <span
+class="math inline">\(S\)</span> 在某个初始时间的值来确定唯一解</p></li>
+</ul>
+<p><strong>雅可比解</strong></p>
+<ul>
+<li><p><strong>定义</strong>：哈密顿-雅可比方程的特定解，由作用量给出：<span
+class="math inline">\(S(q_0, q_1, t) = \int_0^t L(q_{0,1}(\tau),
+\dot{q}_{0,1}(\tau)) \, d\tau\)</span></p></li>
+<li><p><strong>路径条件</strong>：<span
+class="math inline">\(q_{0,1}(\tau)\)</span> 是连接 <span
+class="math inline">\(q_0\)</span> 和 <span
+class="math inline">\(q_1\)</span>
+的真实物理轨迹，满足欧拉-拉格朗日方程</p></li>
+<li><p><strong>存在性</strong>：对于正则系统，哈密顿-雅可比方程存在唯一的雅可比解</p></li>
+<li><p><strong>表达式</strong>：雅可比解由作用量给出，与精确离散拉格朗日函数一致：<span
+class="math inline">\(S(q_0, q_1, t) = L_d^E(q_0, q_1,
+t)\)</span></p></li>
+</ul>
+<h1 id="二时变离散变分力学">二、时变离散变分力学</h1>
+<h2 id="连续拉格朗日力学-1">2.1 连续拉格朗日力学</h2>
+<h3 id="基本定义-5"><strong>2.1.1 基本定义</strong></h3>
+<ul>
+<li><p><strong>配置流形</strong>：<span
+class="math inline">\(Q\)</span>，<strong>时间空间</strong>：<span
+class="math inline">\(\mathbb{R}\)</span></p></li>
+<li><p><strong>扩展配置流形</strong>：<span
+class="math inline">\(\bar{Q} = \mathbb{R} \times Q\)</span></p></li>
+<li><p><strong>扩展状态空间</strong>：<span
+class="math inline">\(\mathbb{R} \times TQ\)</span></p></li>
+<li><p><strong>扩展拉格朗日量</strong>：<span class="math inline">\(L:
+\mathbb{R} \times TQ \to \mathbb{R}\)</span></p></li>
+<li><p><strong>扩展路径空间</strong>：<span
+class="math inline">\(\bar{\mathcal{C}} = \{ c: [a_0, a_f] \to \bar{Q}
+\mid c \text{ 是 } C^2 \text{ 曲线且 } c_t&#39;(a) &gt; 0
+\}\)</span></p></li>
+<li><p><strong>关联曲线</strong>：<span class="math inline">\(q(t) =
+c_q(c_t^{-1}(t))\)</span>，其中 <span class="math inline">\(t_0 =
+c_t(a_0)\)</span>，<span class="math inline">\(t_f =
+c_t(a_f)\)</span></p></li>
+</ul>
+<h3 id="理论成果-5"><strong>2.1.2 理论成果</strong></h3>
+<h4 id="作用量的变分"><strong>作用量的变分</strong></h4>
+<ul>
+<li><p><strong>扩展作用量</strong>：<span
+class="math inline">\(\bar{\mathfrak{G}}(c) = \int_{t_0}^{t_f}
+L(\hat{\dot{q}}(t)) \, dt\)</span>，也可写为：<span
+class="math inline">\(\bar{\mathfrak{G}}(c) = \int_{a_0}^{a_f}
+L\left(c_t, c_q, \frac{c_q&#39;}{c_t&#39;}\right) c_t&#39; \,
+da\)</span></p></li>
+<li><p><strong>变分公式</strong>：<span
+class="math inline">\(\mathbf{d}\bar{\mathfrak{G}}(c) \cdot \delta c =
+\int_{t_0}^{t_f} \bar{D}_{\text{EL}}L(\hat{\tilde{q}}) \cdot \delta c \,
+dt + \bar{\Theta}_L(\hat{\tilde{q}}) \cdot \hat{\delta c}
+\Big|_{t_0}^{t_f}\)</span></p>
+<ul>
+<li><p><span
+class="math inline">\(\bar{D}_{\text{EL}}L\)</span>：扩展欧拉-拉格朗日映射</p></li>
+<li><p><span
+class="math inline">\(\bar{\Theta}_L\)</span>：扩展拉格朗日1-形</p></li>
+</ul></li>
+<li><p><strong>扩展欧拉-拉格朗日方程</strong>：<span
+class="math inline">\(\bar{D}_{\text{EL}}L(\hat{\tilde{q}}) =
+0\)</span>，分量形式为：<span class="math inline">\(\begin{aligned}
+\frac{\partial L}{\partial q^i} - \frac{d}{dt} \left( \frac{\partial
+L}{\partial \dot{q}^i} \right) = 0 \quad \text{(运动方程)}\\
+\frac{\partial L}{\partial t} + \frac{d}{dt} \left( \frac{\partial
+L}{\partial \dot{q}^i} \dot{q}^i - L \right) = 0 \quad \text{(能量演化)}
+\end{aligned}\)</span></p>
+<ul>
+<li>能量演化方程和运动方程是冗余的，满足第一个自然满足第二个，因此第二个方程一般用来分析系统能量变化</li>
+</ul></li>
+<li><p><strong>能量函数</strong>：<span class="math inline">\(E_L(t, q,
+\dot{q}) = \frac{\partial L}{\partial \dot{q}} \cdot \dot{q} -
+L\)</span>，若 <span class="math inline">\(L\)</span> 不显含时间，则
+<span class="math inline">\(E_L\)</span> 守恒。</p></li>
+</ul>
+<h4
+id="拉格朗日向量场与流映射"><strong>拉格朗日向量场与流映射</strong></h4>
+<ul>
+<li><p><strong>扩展拉格朗日向量场</strong>：<span
+class="math inline">\(\bar{X}_L: \mathbb{R} \times TQ \to T(\mathbb{R}
+\times TQ)\)</span>满足：<span
+class="math inline">\(\bar{D}_{\text{EL}}L \circ \bar{X}_L = 0,\quad
+T\pi_{\mathbb{R}} \circ \bar{X}_L = (t, 1)\)</span></p></li>
+<li><p><strong>扩展拉格朗日流映射</strong>：<span
+class="math inline">\(\bar{F}_L^h: \mathbb{R} \times TQ \to \mathbb{R}
+\times TQ\)</span></p></li>
+</ul>
+<h4 id="拉格朗日流的辛性-1"><strong>拉格朗日流的辛性</strong></h4>
+<ul>
+<li><p><strong>扩展拉格朗日辛形式</strong>：<span
+class="math inline">\(\Omega_L = -\mathbf{d}
+\bar{\Theta}_L\)</span></p></li>
+<li><p><strong>守恒律</strong>：<span
+class="math inline">\((\bar{F}_L^h)^* \Omega_L =
+\Omega_L\)</span>，即扩展拉格朗日流保持辛形式不变。</p></li>
+</ul>
+<h4 id="拉格朗日流的守恒律"><strong>拉格朗日流的守恒律</strong></h4>
+<ul>
+<li><p><strong>李群作用</strong>：<span
+class="math inline">\(\Phi^{\bar{Q}}: G \times \bar{Q} \to
+\bar{Q}\)</span></p></li>
+<li><p><strong>扩展拉格朗日动量映射</strong>：<span
+class="math inline">\(\bar{J}_L(t, q, \dot{q}) \cdot \xi =
+\bar{\Theta}_L \cdot \xi_{\mathbb{R} \times TQ}(t, q,
+\dot{q})\)</span>，或<span class="math inline">\(\bar{J}_L(t, q,
+\dot{q}) \cdot \xi = \left\langle \frac{\partial L}{\partial \dot{q}},
+\xi^q_{\bar{Q}} \right\rangle - E_L \cdot
+\xi^t_{\bar{Q}}\)</span></p></li>
+<li><p><strong>扩展诺特定理</strong>：若 <span
+class="math inline">\(L\)</span> 在群作用下对称，则动量映射守恒：<span
+class="math inline">\(\bar{J}_L \circ \bar{F}_L^h =
+\bar{J}_L\)</span></p></li>
+</ul>
+<h2 id="离散拉格朗日力学-1">2.2 离散拉格朗日力学</h2>
+<h3 id="基本定义-6"><strong>2.2.1 基本定义</strong></h3>
+<ul>
+<li><p><strong>扩展离散状态空间</strong>：<span
+class="math inline">\(\bar{Q} \times \bar{Q} = \mathbb{R} \times Q
+\times \mathbb{R} \times Q\)</span></p></li>
+<li><p><strong>扩展离散拉格朗日量</strong>：<span
+class="math inline">\(L_d: \bar{Q} \times \bar{Q} \to
+\mathbb{R}\)</span></p></li>
+<li><p><strong>扩展离散路径空间</strong>：<span
+class="math inline">\(\bar{\mathcal{C}}_d = \{ c: \{0,\ldots,N\} \to
+\bar{Q} \mid c_t(k+1) &gt; c_t(k) \}\)</span></p></li>
+<li><p><strong>关联离散曲线</strong>：<span class="math inline">\(q(t_k)
+= c_q(k)\)</span>，其中 <span class="math inline">\(t_k =
+c_t(k)\)</span>，<span class="math inline">\(q_k =
+c_q(k)\)</span></p></li>
+</ul>
+<h3 id="理论成果-6"><strong>2.2.2 理论成果</strong></h3>
+<h4 id="离散作用量的变分"><strong>离散作用量的变分</strong></h4>
+<ul>
+<li><p><strong>扩展离散作用量和</strong>：<span
+class="math inline">\(\bar{\mathfrak{G}}_d(c) = \sum_{k=0}^{N-1}
+L_d(c(k), c(k+1))\)</span></p></li>
+<li><p><strong>变分公式</strong>：<span
+class="math inline">\(\mathbf{d}\bar{\mathfrak{G}}_d(c) \cdot \delta c =
+\sum_{k=1}^{N-1} \bar{D}_{\text{DEL}}L_d \cdot (\delta q_k, \delta t_k)
++ \bar{\Theta}^+_{L_d} \cdot \delta c_N - \bar{\Theta}^-_{L_d} \cdot
+\delta c_0\)</span></p></li>
+<li><p><span
+class="math inline">\(\bar{D}_{\text{DEL}}L_d\)</span>：扩展离散欧拉-拉格朗日映射</p></li>
+<li><p><span
+class="math inline">\(\bar{\Theta}^\pm_{L_d}\)</span>：扩展离散拉格朗日1-形式</p></li>
+<li><p><strong>扩展离散欧拉-拉格朗日方程</strong>：<span
+class="math inline">\(\bar{D}_{\text{DEL}}L_d(t_{k-1}, q_{k-1}, t_k,
+q_k, t_{k+1}, q_{k+1}) = 0\)</span><br />
+分量形式为：<span class="math inline">\(\begin{aligned}
+D_4L_d(t_{k-1}, q_{k-1}, t_k, q_k) + D_2L_d(t_k, q_k, t_{k+1}, q_{k+1})
+= 0 \quad \text{(动量匹配)}
+\\
+D_3L_d(t_{k-1}, q_{k-1}, t_k, q_k) + D_1L_d(t_k, q_k, t_{k+1}, q_{k+1})
+= 0 \quad \text{(能量匹配)}
+\end{aligned}\)</span></p></li>
+<li><p><strong>离散能量定义</strong>：<span
+class="math inline">\(E^+_{L_d} = -D_3L_d,\quad E^-_{L_d} =
+D_1L_d\)</span><br />
+能量匹配方程等价于：<span class="math inline">\(E^+_{L_d}(t_{k-1},
+q_{k-1}, t_k, q_k) = E^-_{L_d}(t_k, q_k, t_{k+1},
+q_{k+1})\)</span></p></li>
+</ul>
+<h4
+id="扩展离散拉格朗日演化算子与映射"><strong>扩展离散拉格朗日演化算子与映射</strong></h4>
+<ul>
+<li><p><strong>扩展离散拉格朗日演化算子</strong>：<span
+class="math inline">\(\bar{X}{L_d}\)</span>，满足：<span
+class="math inline">\(\bar{D}_{\text{DEL}}L_d \circ \bar{X}_{L_d} =
+0\)</span></p></li>
+<li><p><strong>扩展离散拉格朗日映射</strong>：<span
+class="math inline">\(\bar{F}_{L_d} = \sigma \circ
+X_{L_d}\)</span></p></li>
+<li><p><strong>离散适定性</strong>：若 <span
+class="math inline">\(\bar{F}_{L_d}\)</span> 唯一确定，则称 <span
+class="math inline">\(L_d\)</span>
+是<strong>离散适定的</strong></p></li>
+</ul>
+<h4
+id="扩展离散拉格朗日映射的辛性"><strong>扩展离散拉格朗日映射的辛性</strong></h4>
+<ul>
+<li><p><strong>扩展离散拉格朗日2-形式</strong>：<span
+class="math inline">\(\Omega_{L_d} = -\mathbf{d}\Theta^+_{L_d} =
+-\mathbf{d}\Theta^-_{L_d}\)</span></p></li>
+<li><p><strong>辛守恒律</strong>：<span
+class="math inline">\((\bar{F}_{L_d})^* \Omega_{L_d} =
+\Omega_{L_d}\)</span></p></li>
+</ul>
+<h4 id="扩展离散诺特定理"><strong>扩展离散诺特定理</strong></h4>
+<ul>
+<li><p><strong>扩展离散动量映射</strong>：<span
+class="math inline">\(\bar{J}^+_{L_d} \cdot \xi = \bar{\Theta}^+_{L_d}
+\cdot \xi_{\bar{Q} \times \bar{Q}},\quad
+\bar{J}^-_{L_d} \cdot \xi = \bar{\Theta}^-_{L_d} \cdot \xi_{\bar{Q}
+\times \bar{Q}}\)</span></p></li>
+<li><p><strong>扩展离散诺特定理</strong>：若 <span
+class="math inline">\(L_d\)</span>
+在群作用下不变，则离散动量映射守恒：<span
+class="math inline">\(\bar{J}_{L_d} \circ \bar{F}_{L_d} =
+\bar{J}_{L_d}\)</span></p></li>
+<li><p><strong>特例</strong>：时间平移对称性 ⇒ 离散能量守恒</p></li>
+</ul>
+<h4 id="自治离散拉格朗日"><strong>自治离散拉格朗日</strong></h4>
+<ul>
+<li><p><strong>自治离散拉格朗日</strong>：<span
+class="math inline">\(L&#39;_d(q_0, h, q_1)\)</span>，其中 <span
+class="math inline">\(h = t_1 - t_0\)</span></p></li>
+<li><p><strong>扩展形式</strong>：<span class="math inline">\(L_d(t_0,
+q_0, t_1, q_1) = L&#39;_d(q_0, t_1 - t_0, q_1)\)</span></p></li>
+<li><p><strong>时间平移对称性</strong> ⇒ <span
+class="math inline">\(E^+_{L_d} =
+E^-_{L_d}\)</span>，简化为单一离散能量</p></li>
+</ul>
+<h2 id="连续哈密顿力学-1">2.3 连续哈密顿力学</h2>
+<h3 id="基本定义-7"><strong>2.3.1 基本定义</strong></h3>
+<ul>
+<li><p><strong>扩展相空间</strong>：<span
+class="math inline">\(\mathbb{R} \times T^*Q\)</span></p></li>
+<li><p><strong>扩展哈密顿量</strong>：<span class="math inline">\(H:
+\mathbb{R} \times T^*Q \to \mathbb{R}\)</span></p></li>
+<li><p><strong>扩展正则1-形式</strong>：<span
+class="math inline">\(\bar{\Theta}_H(t,q,p) = p_i \mathbf{d}q^i -
+H(t,q,p) \mathbf{d}t\)</span></p></li>
+<li><p><strong>扩展辛形式（扩展正则2-形式）</strong>：<span
+class="math inline">\(\bar{\Omega}_H = -\mathbf{d}\bar{\Theta}_H =
+\mathbf{d}q^i \wedge \mathbf{d}p_i + \mathbf{d}H \wedge
+\mathbf{d}t\)</span></p></li>
+</ul>
+<h3 id="理论成果-7">2.3.2 理论成果</h3>
+<h4 id="哈密顿向量场与流映射"><strong>哈密顿向量场与流映射</strong></h4>
+<ul>
+<li><p><strong>扩展哈密顿向量场</strong>：<span
+class="math inline">\(\bar{X}_H\)</span><em>，满足：</em><span
+class="math inline">\(\mathbf{i}_{\bar{X}_H} \bar{\Omega}_H =
+0\)</span></p></li>
+<li><p><strong>扩展哈密顿方程</strong>：<span
+class="math inline">\(\dot{q} = \frac{\partial H}{\partial p},\quad
+\dot{p} = -\frac{\partial H}{\partial q}\)</span></p></li>
+<li><p><strong>能量演化</strong>：<span
+class="math inline">\(\frac{dH}{dt} = \frac{\partial H}{\partial
+t}\)</span></p></li>
+</ul>
+<p>若 <span class="math inline">\(H\)</span> 不显含时间，则 <span
+class="math inline">\(H\)</span> 守恒</p>
+<ul>
+<li><strong>扩展流映射</strong>：<span
+class="math inline">\(\bar{F}_H^h: \mathbb{R} \times T^*Q \to \mathbb{R}
+\times T^*Q\)</span>，满足：<span class="math inline">\(\bar{F}_H^h(t_0,
+q_0, p_0) = (t_0 + h, q_1, p_1)\)</span></li>
+</ul>
+<h4 id="扩展哈密顿诺特定理"><strong>扩展哈密顿诺特定理</strong></h4>
+<ul>
+<li><p><strong>扩展哈密顿动量映射</strong>：<span
+class="math inline">\(\bar{J}_H(t,q,p) \cdot \xi = \bar{\Theta}_H \cdot
+\xi_{\mathbb{R} \times T^*Q}(t,q,p)\)</span>或<span
+class="math inline">\(\bar{J}_H(t,q,p) \cdot \xi = \langle p,
+\xi^q_Q(t,q) \rangle - H(t,q,p) \xi^t_Q(t,q)\)</span></p></li>
+<li><p><strong>扩展哈密顿诺特定理</strong>：若群作用保持 <span
+class="math inline">\(\bar{\Theta}_H\)</span>
+不变，则动量映射守恒：<span class="math inline">\(\bar{J}_H \circ
+\bar{F}_H^h = \bar{J}_H\)</span></p></li>
+</ul>
+<h4 id="扩展勒让德变换"><strong>扩展勒让德变换</strong></h4>
+<ul>
+<li><p><strong>扩展勒让德变换</strong>：<span
+class="math inline">\(\bar{\mathbb{F}}L: (t,q,\dot{q}) \mapsto \left(t,
+q, \frac{\partial L}{\partial \dot{q}}\right)\)</span></p></li>
+<li><p><strong>正则性</strong>：</p>
+<ul>
+<li><p>若 <span class="math inline">\(\bar{\mathbb{F}}L\)</span>
+是局部同构 ⇒ <span class="math inline">\(L\)</span>
+是<strong>正则的</strong></p></li>
+<li><p>若 <span class="math inline">\(\bar{\mathbb{F}}L\)</span>
+是全局同构 ⇒ <span class="math inline">\(L\)</span>
+是<strong>超正则的</strong></p></li>
+</ul></li>
+<li><p><strong>关联哈密顿量</strong>：<span class="math inline">\(H =
+E_L \circ (\bar{\mathbb{F}}L)^{-1}\)</span></p></li>
+<li><p><strong>重要关系</strong>：<span
+class="math inline">\(\bar{\Theta}_L = (\bar{\mathbb{F}}L)^*
+\bar{\Theta}_H,\quad
+\bar{\Omega}_L = (\bar{\mathbb{F}}L)^* \bar{\Omega}_H,\quad
+\bar{J}_L = (\bar{\mathbb{F}}L)^* \bar{J}_H\)</span></p></li>
+<li><p><strong>向量场关系</strong>：<span
+class="math inline">\(\bar{X}_L = (\bar{\mathbb{F}}L)^* \bar{X}_H,\quad
+\bar{F}_L^h = (\bar{\mathbb{F}}L)^{-1} \circ \bar{F}_H^h \circ
+\bar{\mathbb{F}}L\)</span></p></li>
+</ul>
+<h4 id="扩展生成函数"><strong>扩展生成函数</strong></h4>
+<ul>
+<li><p><strong>扩展辛变换</strong>：<span class="math inline">\(\varphi:
+\mathbb{R} \times T^*Q \to \mathbb{R} \times
+T^Q\)</span><em>，满足：</em><span class="math inline">\(\varphi^*
+\bar{\Omega}_{H_1} = \bar{\Omega}_{H_0}\)</span></p></li>
+<li><p><strong>图形式</strong>：考虑图 <span
+class="math inline">\(\Gamma(\varphi) \subset (\mathbb{R} \times T^*Q)
+\times (\mathbb{R} \times T^*Q)\)</span></p></li>
+<li><p><strong>扩展生成函数</strong>：存在函数 <span
+class="math inline">\(\bar{S}: \Gamma(\varphi) \to
+\mathbb{R}\)</span>，使得：<span class="math inline">\(i_\varphi^*
+\bar{\Theta}{H_0,H_1} = \mathbf{d}\bar{S}\)</span><em>其中：</em><span
+class="math inline">\(\bar{\Theta}{H_0,H_1} = \pi_2^* \bar{\Theta}_{H_0}
+- \pi_1^* \bar{\Theta}_{H_1}\)</span></p></li>
+</ul>
+<h4 id="坐标表达式"><strong>坐标表达式</strong></h4>
+<ul>
+<li><p><strong>第一类生成函数</strong>：以 <span
+class="math inline">\((q_0, q_1, t_0)\)</span> 为坐标</p></li>
+<li><p><strong>生成函数方程</strong>：<span
+class="math inline">\(\frac{\partial \bar{S}}{\partial q_0} = -p_0 - H_1
+\frac{\partial t_1}{\partial q_0}\)</span>，<span
+class="math inline">\(\frac{\partial \bar{S}}{\partial q_1} = p_1 - H_1
+\frac{\partial t_1}{\partial q_1}\)</span>，<span
+class="math inline">\(\frac{\partial \bar{S}}{\partial t_0} = H_0 - H_1
+\frac{\partial t_1}{\partial t_0}\)</span></p></li>
+<li><p><strong>这些方程隐式定义了辛变换</strong> <span
+class="math inline">\(\varphi: (t_0, q_0, p_0) \mapsto (t_1, q_1,
+p_1)\)</span></p></li>
+</ul>
+<h2 id="离散哈密顿力学-1">2.4 离散哈密顿力学</h2>
+<h3 id="扩展离散勒让德变换"><strong>扩展离散勒让德变换</strong></h3>
+<ul>
+<li><p><strong>扩展离散勒让德变换</strong>：<span
+class="math inline">\(\begin{aligned}
+\bar{\mathbb{F}}^+L_d(t_0,q_0,t_1,q_1) &amp;= (t_1, q_1,
+D_4L_d(t_0,q_0,t_1,q_1))
+\\
+\bar{\mathbb{F}}^-L_d(t_0,q_0,t_1,q_1) &amp;= (t_0, q_0,
+-D_2L_d(t_0,q_0,t_1,q_1))
+\end{aligned}\)</span></p></li>
+<li><p><strong>正则性</strong>：</p>
+<ul>
+<li><p>由于 <span class="math inline">\(\bar{Q} \times \bar{Q}\)</span>
+比 <span class="math inline">\(\mathbb{R} \times T^*Q\)</span>
+维数高，这些映射不可能是同构</p></li>
+<li><p>若两个映射都是满射 ⇒ <span class="math inline">\(L_d\)</span>
+是<strong>正则的</strong></p></li>
+<li><p>若全局满射 ⇒ <span class="math inline">\(L_d\)</span>
+是<strong>超正则的</strong>（通常要求 <span
+class="math inline">\(Q\)</span> 是线性空间）</p></li>
+</ul></li>
+</ul>
+<h3 id="动量和能量匹配"><strong>动量和能量匹配</strong></h3>
+<ul>
+<li><p><strong>离散动量定义</strong>：<span
+class="math inline">\(p^+_{k,k+1} = D_4L_d(t_k,q_k,t_{k+1},q_{k+1})
+\\
+p^-_{k,k+1} = -D_2L_d(t_k,q_k,t_{k+1},q_{k+1})\)</span></p></li>
+<li><p><strong>离散能量定义</strong>：<span
+class="math inline">\(E^+_{k,k+1} = -D_3L_d
+\\
+E^-_{k,k+1} = D_1L_d\)</span></p></li>
+<li><p><strong>离散欧拉-拉格朗日方程的重新表述</strong>：<span
+class="math inline">\(p^+_{k-1,k} = p^-_{k,k+1} \quad \text{(动量匹配)}
+\\
+E^+_{k-1,k} = E^-_{k,k+1} \quad \text{(能量匹配)}\)</span></p></li>
+<li><p><strong>离散一形式的紧凑形式</strong>：<span
+class="math inline">\(\Theta^+{L_d} = p^+ \mathbf{d}q_1 - E^+
+\mathbf{d}t_1
+\\
+\Theta^-{L_d} = p^- \mathbf{d}q_0 - E^- \mathbf{d}t_0\)</span></p></li>
+</ul>
+<h3 id="扩展离散哈密顿映射"><strong>扩展离散哈密顿映射</strong></h3>
+<ul>
+<li><p><strong>问题</strong>：离散勒让德变换不是单射，无法直接推前离散拉格朗日映射</p></li>
+<li><p><strong>解决方案</strong>：引入带时间步长的扩展相空间 <span
+class="math inline">\((\mathbb{R} \times T^*Q) \times
+\mathbb{R}\)</span></p>
+<ul>
+<li>元素：<span class="math inline">\((t,q,p,h)\)</span>，其中 <span
+class="math inline">\(h\)</span> 是时间步长</li>
+</ul></li>
+<li><p><strong>改进的离散勒让德变换</strong>：<span
+class="math inline">\(\bar{\mathbb{F}}^-L_d: (t_0,q_0,t_1,q_1) \mapsto
+(t_0,q_0,p_0,h_0) = (t_0,q_0,-D_2L_d, t_1-t_0)\)</span></p></li>
+<li><p><strong>扩展离散哈密顿映射</strong>：<span
+class="math inline">\(\tilde{F}{L_d}: (\mathbb{R} \times T^*Q) \times
+\mathbb{R} \to (\mathbb{R} \times T^*Q) \times
+\mathbb{R}\)</span>，<span class="math inline">\(\tilde{F}{L_d} =
+(\bar{\mathbb{F}}^-L_d) \circ \bar{F}_{L_d} \circ
+(\bar{\mathbb{F}}^-L_d)^{-1}\)</span></p></li>
+<li><p><strong>交换图</strong>：</p>
+<p><figure class="highlight plaintext"><figcaption><span>Text</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(t₀,q₀,t₁,q₁) → (t₁,q₁,t₂,q₂)</span><br><span class="line">      ↓              ↓</span><br><span class="line">(t₀,q₀,p₀,h₀) → (t₁,q₁,p₁,h₁)</span><br></pre></td></tr></table></figure></p></li>
+</ul>
+<h3
+id="扩展离散拉格朗日量是扩展生成函数"><strong>扩展离散拉格朗日量是扩展生成函数</strong></h3>
+<ul>
+<li><p><strong>固定时间步长</strong> <span
+class="math inline">\(h\)</span>，定义限制映射：<span
+class="math inline">\(\varphi^h: \mathbb{R} \times T^*Q \to \mathbb{R}
+\times T^*Q\)</span>，<span class="math inline">\(\varphi^h:
+(t_0,q_0,p_0) \mapsto (t_1,q_1,p_1)\)</span></p></li>
+<li><p><strong>相关哈密顿量</strong>：<span
+class="math inline">\(H_0^h(t_0,q_0,p_0) = E^-{L_d}(t_0,q_0,t_1,q_1)
+\\
+H_1^h(t_1,q_1,p_1) = E^+{L_d}(t_0,q_0,t_1,q_1)\)</span></p></li>
+<li><p><strong>扩展生成函数</strong>：<span
+class="math inline">\(\bar{S}^h(q_0,q_1,t_0) =
+L_d(t_0,q_0,t_1,q_1)\)</span></p></li>
+<li><p><strong>关键定理</strong>：映射 <span
+class="math inline">\(\varphi^h\)</span> 由扩展生成函数 <span
+class="math inline">\(\bar{S}^h\)</span> 生成</p></li>
+<li><p><strong>证明要点</strong>：<span
+class="math inline">\(\frac{\partial \bar{S}^h}{\partial q_0} =
+-p_0,\quad
+\frac{\partial \bar{S}^h}{\partial q_1} = p_1,\quad
+\frac{\partial \bar{S}^h}{\partial t_0} = H_0^h -
+H_1^h\)</span>，这与扩展生成函数方程一致</p></li>
+</ul>
+<h2 id="哈密顿-雅可比理论-1">2.5 哈密顿-雅可比理论</h2>
+<h1 id="三受迫离散变分力学">三、受迫离散变分力学</h1>
+<h2 id="连续受迫力学">3.1 连续受迫力学</h2>
+<h3 id="受迫拉格朗日系统">3.1.1 受迫拉格朗日系统</h3>
+<p><strong>拉格朗日力</strong> 是一个保持纤维的映射：<span
+class="math inline">\(f_L : TQ \to T^*Q\)</span>，坐标表示为：<span
+class="math inline">\(f_L : (q, \dot{q}) \mapsto (q, f_L(q,
+\dot{q}))\)</span></p>
+<p>我们修改 Hamilton 原理为<strong>Lagrange–d’Alembert
+原理</strong>：寻找曲线 <span class="math inline">\(q \in
+\mathcal{C}(Q)\)</span>使得：<span class="math inline">\(\delta \int_0^T
+L(q, \dot{q}) dt + \int_0^T f_L(q, \dot{q}) \cdot \delta q dt = 0
+\tag{3.1.1}\)</span>通过分部积分可得<strong>受迫欧拉–拉格朗日方程</strong>：<span
+class="math inline">\(\frac{\partial L}{\partial q} - \frac{d}{dt}
+\left( \frac{\partial L}{\partial \dot{q}} \right) + f_L(q, \dot{q}) = 0
+\tag{3.1.2}\)</span></p>
+<h3 id="受迫哈密顿系统">3.1.2 受迫哈密顿系统</h3>
+<p><strong>哈密顿力</strong> 是一个保持纤维的映射：<span
+class="math inline">\(f_H : T^*Q \to
+T^*Q\)</span>定义对应的水平一形式：<span
+class="math inline">\(f&#39;_H(p_q) \cdot u_{p_q} = \langle f_H(p_q),
+T\pi_Q \cdot u_{p_q} \rangle\)</span>，坐标下为：<span
+class="math inline">\(f&#39;_H(q,p) \cdot (\delta q, \delta p) =
+f_H(q,p) \cdot \delta q\)</span></p>
+<p><strong>受迫哈密顿向量场</strong> <span
+class="math inline">\(X_H\)</span> 满足：<span
+class="math inline">\(i_{X_H} \Omega = dH - f&#39;_H\)</span>
+坐标下为<strong>受迫哈密顿方程</strong>：<span
+class="math inline">\(\begin{aligned}
+X_q &amp;= \frac{\partial H}{\partial p} \\
+X_p &amp;= -\frac{\partial H}{\partial q} + f_H(q,p)
+\end{aligned} \tag{3.1.3}\)</span></p>
+<h3 id="带力的勒让德变换">3.1.3 带力的勒让德变换</h3>
+<p>若 <span class="math inline">\(L\)</span> 与<span
+class="math inline">\(H\)</span>通过勒让德变换相联系，则拉格朗日力与哈密顿力满足：<span
+class="math inline">\(f_L = f_H \circ \mathbb{F}L\)</span></p>
+<p>此时，受迫欧拉–拉格朗日方程与受迫哈密顿方程是等价的。</p>
+<h3 id="带力的诺特定理">3.1.4 带力的诺特定理</h3>
+<p>设<span class="math inline">\(L\)</span>在群作用<span
+class="math inline">\(\Phi : G \times Q \to
+Q\)</span>下对称，其动量映射为<span
+class="math inline">\(J_L\)</span>。</p>
+<p>若外力满足：<span class="math inline">\(\langle f_L(q, \dot{q}),
+\xi_Q(q) \rangle = 0 \quad \forall \xi \in
+\mathfrak{g}\)</span>，则动量映射仍守恒：<span class="math inline">\(J_L
+\circ F^t_L = J_L \quad \forall t\)</span></p>
+<p>否则，动量映射的变化由下式给出：<span class="math inline">\(\left[
+J_L(F^T_L) - J_L \right] \cdot \xi = \int_0^T f_L \cdot \xi_Q dt
+\tag{3.1.4}\)</span></p>
+<blockquote>
+<p>注意：在非零外力下，系统的辛结构不再守恒。<span
+class="math inline">\(i_{X_H}\Omega=dH-f_H\)</span></p>
+</blockquote>
+<h2 id="离散受迫力学">3.2 离散受迫力学</h2>
+<h3 id="离散-lagrange-dalembert-原理">3.2.1 离散 Lagrange-d'Alembert
+原理</h3>
+<ul>
+<li><p>在离散框架中，我们引入两个离散拉格朗日力：<span
+class="math inline">\(f_d^+, f_d^- : Q \times Q \to T^*Q\)</span><br />
+坐标表示为：<span class="math inline">\(\begin{aligned}
+f_d^+(q_0, q_1) &amp;= (q_1, f_d^+(q_0, q_1)) \\
+f_d^-(q_0, q_1) &amp;= (q_0, f_d^-(q_0, q_1))
+\end{aligned}\)</span><br />
+将它们组合成单个一形式：<span class="math inline">\(f_d(q_0, q_1) \cdot
+(\delta q_0, \delta q_1) = f_d^+(q_0, q_1) \cdot \delta q_1 + f_d^-(q_0,
+q_1) \cdot \delta q_0\)</span></p></li>
+<li><p><strong>离散 Lagrange-d'Alembert 原理</strong> 寻求离散曲线 <span
+class="math inline">\(\{q_k\}_{k=0}^N\)</span>满足：<span
+class="math inline">\(\delta \sum_{k=0}^{N-1} L_d(q_k, q_{k+1}) +
+\sum_{k=0}^{N-1} \left[f_d^-(q_k, q_{k+1}) \cdot \delta q_k + f_d^+(q_k,
+q_{k+1}) \cdot \delta q_{k+1}\right] = 0
+\tag{3.2.2}\)</span>这等价于受迫离散欧拉-拉格朗日方程：<span
+class="math inline">\(D_2 L_d(q_{k-1}, q_k) + D_1 L_d(q_k, q_{k+1}) +
+f_d^+(q_{k-1}, q_k) + f_d^-(q_k, q_{k+1}) =
+0\tag{3.2.3}\)</span></p></li>
+</ul>
+<h3 id="带外力的离散勒让德变换">3.2.2 带外力的离散勒让德变换</h3>
+<ul>
+<li><p>定义受迫离散勒让德变换：<span
+class="math inline">\(\begin{aligned}
+\mathbb{F}^{f+}L_d &amp;: (q_0, q_1) \mapsto (q_1, p_1) = (q_1, D_2
+L_d(q_0, q_1) + f_d^+(q_0, q_1)) \\
+\mathbb{F}^{f-}L_d &amp;: (q_0, q_1) \mapsto (q_0, p_0) = (q_0, -D_1
+L_d(q_0, q_1) - f_d^-(q_0, q_1))
+\end{aligned}
+\tag{3.2.4}\)</span></p></li>
+<li><p><strong>受迫离散哈密顿映射</strong> <span
+class="math inline">\(\tilde{F}_{L_d} : (q_0, p_0) \mapsto (q_1,
+p_1)\)</span>由下式给出：</p></li>
+</ul>
+<p><span class="math inline">\(\begin{aligned}
+p_0 &amp;= -D_1 L_d(q_0, q_1) - f_d^-(q_0, q_1) \\
+p_1 &amp;= D_2 L_d(q_0, q_1) + f_d^+(q_0, q_1)
+\end{aligned}
+\tag{3.2.5}\)</span></p>
+<h3 id="带外力的离散诺特定理">3.2.3 带外力的离散诺特定理</h3>
+<ul>
+<li><p>在存在外力的情况下，离散动量映射应基于受迫离散勒让德变换定义：<span
+class="math inline">\(\begin{aligned}
+J_{L_d}^{f+}(q_0, q_1) \cdot \xi &amp;= \langle \mathbb{F}^{f+}L_d(q_0,
+q_1), \xi_Q(q_1) \rangle \\
+J_{L_d}^{f-}(q_0, q_1) \cdot \xi &amp;= \langle \mathbb{F}^{f-}L_d(q_0,
+q_1), \xi_Q(q_0) \rangle
+\end{aligned}
+\tag{3.2.6}\)</span></p></li>
+<li><p><strong>定理 3.2.1（离散受迫诺特定理）</strong>： 如果离散力满足
+<span class="math inline">\(\langle f_d, \xi_{Q\times Q} \rangle =
+0\)</span>对所有 <span class="math inline">\(\xi \in
+\mathfrak{g}\)</span>，则离散动量映射<span
+class="math inline">\(J_{L_d}^f\)</span>守恒：<span
+class="math inline">\(J_{L_d}^f \circ F_{L_d} =
+J_{L_d}^f\)</span>，</p></li>
+</ul>
+<blockquote>
+<p><strong>重要</strong>：在存在外力的情况下，离散辛形式不再守恒。</p>
+</blockquote>
+<h3 id="精确离散外力">3.2.4 精确离散外力</h3>
+<ul>
+<li>给定连续系统 <span class="math inline">\((L,
+f_L)\)</span>，定义精确离散量：<span
+class="math inline">\(\begin{aligned}
+L_d^E(q_0, q_1, h) &amp;= \int_0^h L(q(t), \dot{q}(t)) dt \\
+f_d^{E+}(q_0, q_1, h) &amp;= \int_0^h f_L(q(t), \dot{q}(t)) \cdot
+\frac{\partial q(t)}{\partial q_1} dt \\
+f_d^{E-}(q_0, q_1, h) &amp;= \int_0^h f_L(q(t), \dot{q}(t)) \cdot
+\frac{\partial q(t)}{\partial q_0} dt
+\end{aligned}
+\tag{3.2.7}\)</span>其中<span
+class="math inline">\(q(t)\)</span>是受迫欧拉-拉格朗日方程满足边界条件<span
+class="math inline">\(q(0)=q_0,
+q(h)=q_1\)</span>的解。这些精确离散量建立了离散系统与连续系统的等价性。</li>
+</ul>
+<h3 id="受迫系统的积分">3.2.5 受迫系统的积分</h3>
+<p><strong>示例 3.2.2：α-方法</strong></p>
+<ul>
+<li>对于离散拉格朗日<span
+class="math inline">\(L_d^\alpha\)</span>，自然选择离散力为：<span
+class="math inline">\(\begin{aligned}
+f_d^{\alpha+} &amp;= \alpha h f_L\left((1-\alpha)q_0 + \alpha q_1,
+\frac{q_1 - q_0}{h}\right) \\
+f_d^{\alpha-} &amp;= (1-\alpha) h f_L\left((1-\alpha)q_0 + \alpha q_1,
+\frac{q_1 - q_0}{h}\right)
+\end{aligned}\)</span><br />
+当<span class="math inline">\(\alpha =
+1/2\)</span>时，即为中点规则。</li>
+</ul>
+<p><strong>示例 3.2.3：耗散系统</strong></p>
+<ul>
+<li>对于满足<span class="math inline">\(\langle f_L(q,\dot{q}),
+(q,\dot{q}) \rangle &lt; 0\)</span>的耗散力，系统能量递减：<span
+class="math inline">\(\frac{d}{dt} E_L(q(t), \dot{q}(t)) = f_L(q(t),
+\dot{q}(t)) \cdot \dot{q}(t) &lt;
+0\)</span>，变分方法能准确跟踪这种能量耗散行为。</li>
+</ul>
+<p><strong>示例 3.2.4：组合方法</strong></p>
+<ul>
+<li>可以通过组合多个受迫离散拉格朗日量来构造高阶方法。组合离散力和拉格朗日量定义为：<span
+class="math inline">\(\begin{aligned}
+L_d(q_0, q_1, h) &amp;= \sum_{i=1}^s L_d(q_{i-1}, q_i, \gamma^i h) \\
+f_d^+(q_0, q_1, h) &amp;= f_d^{s+}(q_{s-1}, q_s, \gamma^s h) +
+\sum_{i=1}^{s-1} (\cdots) \cdot \frac{\partial q_i}{\partial q_1} \\
+f_d^-(q_0, q_1, h) &amp;= f_d^{1-}(q_0, q_1, \gamma^1 h) +
+\sum_{i=1}^{s-1} (\cdots) \cdot \frac{\partial q_i}{\partial q_0}
+\end{aligned}\)</span></li>
+</ul>
+<p><strong>示例 3.2.5：辛分区龙格-库塔方法</strong></p>
+<ul>
+<li>对于离散拉格朗日：<span class="math inline">\(L_d(q_0, q_1, h) = h
+\sum_{i=1}^s b_i L(Q_i, \dot{Q}_i)\)</span>相应的离散力为：<span
+class="math inline">\(\begin{aligned}
+f_d^+(q_0, q_1, h) &amp;= h \sum_{i=1}^s b_i f_L(Q_i, \dot{Q}_i) \cdot
+\frac{\partial Q_i}{\partial q_0} \\
+f_d^-(q_0, q_1, h) &amp;= h \sum_{i=1}^s b_i f_L(Q_i, \dot{Q}_i) \cdot
+\frac{\partial Q_i}{\partial q_1}
+\end{aligned}
+\tag{3.2.8}\)</span></li>
+</ul>
+<p>这给出了受迫哈密顿系统的分区龙格-库塔方法。</p>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

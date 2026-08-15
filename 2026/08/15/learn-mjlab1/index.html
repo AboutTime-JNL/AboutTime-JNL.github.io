@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——文件架构（Mjlab Learning - File Structure） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——文件架构（Mjlab Learning - File Structure）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <p><img src="Mjlab1-image.png" /></p>
+<h1 id="utils">Utils</h1>
+<p>该目录汇集通用工具函数与基础设施（如日志、随机数、MuJoCo
+辅助、配置与类型工具、包装器等），用于减少重复实现并为各模块提供共享能力支撑。</p>
+<h1 id="概念框架">概念框架</h1>
+<p>Mjlab is organized into two layers: a <strong>simulation
+layer</strong> that models the robot and world, and a <strong>manager
+layer</strong> that defines the reinforcement learning problem on top of
+it. Understanding this separation is the fastest way to build a mental
+map of the system.</p>
+<p><img src="Mjlab1-VlOsbffIloFveMx3B0xcqtIUn3e.png" /></p>
+<p>Entities are composed into an MjSpec, compiled, and transferred to
+MuJoCo Warp for GPU simulation. The ManagerBasedRlEnv orchestrates the
+MDP; RSL-RL handles training.</p>
+<h1 id="the-simulation-layer">The simulation layer</h1>
+<p><strong>Scene pipeline.</strong> mjlab constructs scenes by composing
+entity descriptions into a single <a
+target="_blank" rel="noopener" href="https://mujoco.readthedocs.io/en/stable/programming/modeledit.html">MjSpec</a>.
+Each entity starts from an <a
+target="_blank" rel="noopener" href="https://mujoco.readthedocs.io/en/latest/modeling.html">MJCF</a>
+file loaded via <code>MjSpec.from_file()</code>. Users who define
+everything in XML can use this directly. For more control, Python
+dataclasses can extend or override properties on the loaded spec:
+actuators, collision rules, materials, sensors, and initial state. This
+hybrid approach lets users start from existing MuJoCo models and layer
+on task-specific configuration without modifying the original XML. The
+composed specification is compiled into an <code>MjModel</code> on the
+CPU, then transferred to the GPU via <a
+target="_blank" rel="noopener" href="https://mujoco.readthedocs.io/en/stable/mjwarp/index.html">MuJoCo
+Warp</a>, which is built on <a
+target="_blank" rel="noopener" href="https://nvidia.github.io/warp/">NVIDIA Warp</a>.</p>
+<p><strong>MuJoCo Warp.</strong> MuJoCo Warp is a GPU-accelerated
+backend for MuJoCo. It preserves MuJoCo’s
+<code>MjModel</code>/<code>MjData</code> paradigm but adds a leading
+<em>world</em> dimension: a single <code>MjData</code> object holds the
+state of N independent simulation instances in parallel, enabling
+thousands of environments to be stepped simultaneously. Model parameters
+are shared across all worlds by default, and individual fields can be
+expanded to vary per-world when domain randomization requires it. mjlab
+captures the simulation step as a <a
+target="_blank" rel="noopener" href="https://developer.nvidia.com/blog/cuda-graphs">CUDA graph</a>: the
+kernel execution sequence is recorded once and replayed on subsequent
+calls, eliminating CPU-side dispatch overhead.</p>
+<p><strong>Components.</strong> The simulation layer provides four core
+components, each with its own documentation page:</p>
+<ul>
+<li><p><a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/entity/index.html#entity">Entity</a>:
+a robot, a manipulated object, or a static object such as <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/terrain.html#terrain">terrain</a>,
+defined by an MJCF description plus optional Python configuration for
+actuators, collision rules, and initial state.</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/actuators.html#actuators">Actuators</a>:
+how entities are controlled. Users can wrap actuators already defined in
+MJCF or create new ones from Python configuration.</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/sensors/index.html#sensors">Sensors</a>:
+how the world is observed. Includes MuJoCo-native sensors as well as
+custom sensors like RGB-D cameras and raycasters.</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/scene.html#scene">Scene</a>:
+scene composition and environment placement.</p></li>
+</ul>
+<h1 id="the-manager-layer">The manager layer</h1>
+<p>On top of the simulation layer, mjlab adopts the manager-based
+environment design introduced by Isaac Lab. Users define their
+environment by composing small, self-contained <em>terms</em> (reward
+functions, observation computations, domain randomization events) and
+register them with the appropriate manager. Each manager handles the
+lifecycle of its terms: calling them at the right point in the
+simulation loop, aggregating their outputs, and exposing
+diagnostics.</p>
+<p>Terms can be plain functions for stateless computations, or classes
+that inherit from <code>ManagerTermBase</code> when they need to cache
+expensive setup (such as resolving regex patterns to joint indices at
+initialization) or maintain per-episode state through a
+<code>reset()</code> hook.</p>
+<p>Environments are configured through
+<code>ManagerBasedRlEnvCfg</code>, a plain dataclass that holds term
+configuration dictionaries for each manager.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.envs <span class="keyword">import</span> ManagerBasedRlEnvCfg</span><br><span class="line"></span><br><span class="line">cfg = ManagerBasedRlEnvCfg(</span><br><span class="line">    decimation=<span class="number">4</span>,           <span class="comment"># 4 physics steps per policy step</span></span><br><span class="line">    episode_length_s=<span class="number">20.0</span>,</span><br><span class="line">    scene=...,              <span class="comment"># SceneCfg: terrain, entities, sensors</span></span><br><span class="line">    sim=...,                <span class="comment"># SimulationCfg: timestep, solver, integrator</span></span><br><span class="line">    observations=&#123;...&#125;,     <span class="comment"># ObservationManager terms</span></span><br><span class="line">    actions=&#123;...&#125;,          <span class="comment"># ActionManager terms</span></span><br><span class="line">    rewards=&#123;...&#125;,          <span class="comment"># RewardManager terms</span></span><br><span class="line">    terminations=&#123;...&#125;,     <span class="comment"># TerminationManager terms</span></span><br><span class="line">    events=&#123;...&#125;,           <span class="comment"># EventManager terms (resets, DR)</span></span><br><span class="line">    commands=&#123;...&#125;,         <span class="comment"># CommandManager terms (velocity targets, etc.)</span></span><br><span class="line">    curriculum=&#123;...&#125;,       <span class="comment"># CurriculumManager terms</span></span><br><span class="line">    metrics=&#123;...&#125;,          <span class="comment"># MetricsManager terms</span></span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<h4 id="the-eight-managers">The eight managers</h4>
+<ul>
+<li><p><strong>ObservationManager</strong>: assembles observation groups
+with configurable processing (clipping, noise, delay, history). Supports
+asymmetric actor-critic. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/observations.html#observations">Observations</a>.</p></li>
+<li><p><strong>ActionManager</strong>: routes the policy’s output tensor
+to entity actuators, handling scaling and offset. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/actions.html#actions">Actions</a>.</p></li>
+<li><p><strong>RewardManager</strong>: computes a weighted sum of reward
+terms, scaled by step duration for frequency invariance. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/rewards.html#rewards">Rewards</a>.</p></li>
+<li><p><strong>TerminationManager</strong>: evaluates stop conditions,
+distinguishing terminal resets from timeouts. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/terminations.html#terminations">Terminations</a>.</p></li>
+<li><p><strong>EventManager</strong>: fires terms at lifecycle points
+(startup, reset, interval). Domain randomization is implemented through
+event terms. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/events.html#events">Events</a>
+and <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/randomization.html#domain-randomization">Domain
+Randomization</a>.</p></li>
+<li><p><strong>CommandManager</strong>: generates and resamples goal
+signals (velocity targets, pose targets). See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/commands.html#commands">Commands</a>.</p></li>
+<li><p><strong>CurriculumManager</strong>: adjusts training conditions
+based on policy performance. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/curriculum.html#curriculum">Curriculum</a>.</p></li>
+<li><p><strong>MetricsManager</strong>: logs custom per-step values as
+episode averages. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/metrics.html#metrics">Metrics</a>.</p></li>
+</ul>
+<p>For the full configuration reference covering all managers, see <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#environment-config">Environment
+Configuration</a>.</p>
+<h1 id="the-environment-lifecycle">The environment lifecycle</h1>
+<p>Each environment instance passes through four phases.</p>
+<ol type="1">
+<li><p><strong>Build.</strong> <code>Scene</code> composes entity MJCF
+files via <code>MjSpec</code> and compiles <code>MjModel</code> on the
+CPU. <code>Simulation</code> uploads the model to the GPU via MuJoCo
+Warp, allocating a single <code>MjData</code> with N parallel worlds.
+CUDA graphs for <code>step</code>, <code>forward</code>,
+<code>reset</code>, and <code>sense</code> are captured.</p></li>
+<li><p><strong>Initialize.</strong> Managers are constructed from the
+term configuration dictionaries. Regex patterns are matched to joint,
+body, and geom indices. Observation history and delay buffers are
+allocated. Model fields required by domain randomization terms are
+expanded from shared to per-world storage, and CUDA graphs are rebuilt
+to reflect the new layout. Startup events are fired once.</p></li>
+<li><p><strong>Reset.</strong> Called at the start of training and
+whenever an environment terminates or times out. The
+<code>EventManager</code> fires <code>reset</code> terms, which return
+the scene to an initial state with optional randomization. Command
+targets are resampled. Observation history buffers are cleared.</p></li>
+<li><p><strong>Step.</strong> The policy action is processed by the
+<code>ActionManager</code>. The physics simulation advances
+<code>decimation</code> times, with actuator commands applied and entity
+state updated each sub-step. After the decimation loop, the
+<code>TerminationManager</code> checks stop conditions, the
+<code>RewardManager</code> computes the reward signal, and any
+terminated environments are reset. A single <code>forward()</code> call
+refreshes derived quantities for all environments. The
+<code>CommandManager</code> advances or resamples goals. Interval events
+fire if scheduled. Sensors update. The <code>ObservationManager</code>
+assembles the observation for the next policy query.</p></li>
+</ol>
+<p>The step sequence in order:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">action_manager.process_action(action)</span><br><span class="line"><span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(decimation):</span><br><span class="line">    action_manager.apply_action()</span><br><span class="line">    sim.step()</span><br><span class="line">    scene.update()</span><br><span class="line">termination_manager.compute()</span><br><span class="line">reward_manager.compute()</span><br><span class="line">metrics_manager.compute()</span><br><span class="line">[reset terminated envs]</span><br><span class="line">sim.forward()</span><br><span class="line">command_manager.compute()</span><br><span class="line">event_manager.apply(mode=<span class="string">&quot;interval&quot;</span>)</span><br><span class="line">sim.sense()</span><br><span class="line">observation_manager.compute()</span><br></pre></td></tr></table></figure>
+<p>With this mental model in place, the Concepts pages cover each
+simulation layer component in detail, and The Manager Layer pages walk
+through each manager's configuration and built-in terms.</p>
+<h3 id="registration-and-training">Registration and training</h3>
+<p>The last step is to register the task so it can be launched by name.
+Each registration pairs an environment config with an RL config that
+specifies the network architecture and PPO hyperparameters. For cartpole
+a small network of two 64 unit hidden layers is plenty. The full RL
+config is in <code>cartpole_env_cfg.py</code> alongside the environment
+config.</p>
+<p>This goes in <code>init.py</code>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">register_mjlab_task(</span><br><span class="line">    task_id=<span class="string">&quot;Mjlab-Cartpole-Swingup&quot;</span>,</span><br><span class="line">    env_cfg=cartpole_swingup_env_cfg(),</span><br><span class="line">    play_env_cfg=cartpole_swingup_env_cfg(play=<span class="literal">True</span>),</span><br><span class="line">    rl_cfg=cartpole_ppo_runner_cfg(),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Train:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">uv run train Mjlab-Cartpole-Swingup --num-envs <span class="number">4096</span></span><br></pre></td></tr></table></figure>
+<p>Play back a trained checkpoint, either from a local file or a W&amp;B
+run:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">uv run play Mjlab-Cartpole-Swingup --checkpoint-file logs/rsl_rl/cartpole/model_500.pt</span><br><span class="line">uv run play Mjlab-Cartpole-Swingup --wandb-run-path &lt;user/project/run_id&gt;</span><br></pre></td></tr></table></figure>
+<p><img src="Mjlab1-CEswb1HNaoou6HxtC9tccRV2nwe.png" /></p>
+<p>Mean reward over 5 seeds (shaded: one standard deviation).</p>
+<p>Config fields can be overridden from the CLI:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">uv run train Mjlab-Cartpole-Swingup \</span><br><span class="line">    --num-envs <span class="number">8192</span> \</span><br><span class="line">    --agent.algorithm.learning-rate <span class="number">3e-4</span> \</span><br><span class="line">    --agent.algorithm.entropy-coef <span class="number">0.005</span></span><br></pre></td></tr></table></figure>
+<h3 id="next-steps">Next steps</h3>
+<p><strong>Add observation noise.</strong> The current config has no
+noise, so the policy is brittle. Add noise to any observation term to
+train a more robust policy:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.utils.noise <span class="keyword">import</span> UniformNoiseCfg</span><br><span class="line"></span><br><span class="line">ObservationTermCfg(</span><br><span class="line">    func=joint_pos_rel,</span><br><span class="line">    params=&#123;<span class="string">&quot;asset_cfg&quot;</span>: cart_cfg&#125;,</span><br><span class="line">    noise=UniformNoiseCfg(n_min=-<span class="number">0.05</span>, n_max=<span class="number">0.05</span>),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p><strong>Randomize the physics.</strong> Use the <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/randomization.html#domain-randomization">Domain
+Randomization</a> system to vary pole mass or joint damping across
+environments, training a policy that transfers across physical
+variations.</p>
+<p><strong>Explore other tasks.</strong> The library ships with
+locomotion, manipulation, and motion tracking tasks you can run out of
+the box: <code>Mjlab-Velocity-Flat-Unitree-Go1</code>,
+<code>Mjlab-Lift-Cube-Yam</code>, and
+<code>Mjlab-Tracking-Flat-Unitree-G1</code>, among others. Reading their
+source shows how more complex observation and reward structures are
+composed.</p>
+<p><strong>Build something new.</strong> The cartpole is intentionally
+minimal. Once you are comfortable with the pieces, try designing your
+own robot model and task from scratch. The same pattern applies
+regardless of how complex the system becomes.</p>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

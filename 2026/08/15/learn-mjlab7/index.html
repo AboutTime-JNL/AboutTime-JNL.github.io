@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——Tasks（Mjlab Learning - Tasks） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——Tasks（Mjlab Learning - Tasks）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <p>该目录用于组织任务定义与任务注册机制，负责把不同任务场景（如平衡、操作、跟踪、速度控制等）纳入统一入口，支持按名称发现、加载和实例化任务配置</p>
+<h1 id="registry.py">registry.py</h1>
+<p>任务注册中心，提供
+<code>register_mjlab_task()</code>、<code>list_tasks()</code>、<code>load_env_cfg()</code>、<code>load_rl_cfg()</code>、<code>load_runner_cls()</code></p>
+<ul>
+<li><p><code>task_id</code>: a unique name following the convention
+<code>Mjlab-&#123;Category&#125;-&#123;Terrain&#125;-&#123;Robot&#125;</code></p></li>
+<li><p><code>env_cfg</code>: the <code>ManagerBasedRlEnvCfg</code> used
+for training</p></li>
+<li><p><code>play_env_cfg</code>: a variant with randomization disabled
+and episode length set to infinity, used for evaluation</p></li>
+<li><p><code>rl_cfg</code>: the <code>RslRlOnPolicyRunnerCfg</code> with
+PPO hyperparameters and network architecture</p></li>
+<li><p><code>runner_cls</code>: an optional custom runner class
+(defaults to
+<code>MjlabOnPolicyRunner</code>)，允许采用不同强化学习算法（对于环境来说，没有不同的环境类，因此不需要该参数）</p></li>
+</ul>
+<h1 id="task">Task</h1>
+<h2 id="config">config</h2>
+<blockquote>
+<p>任务参数配置</p>
+</blockquote>
+<h3 id="env_cfgs.py">env_cfgs.py</h3>
+<h3 id="rl_cfg.py">rl_cfg.py</h3>
+<h2 id="mdp">mdp</h2>
+<blockquote>
+<p>任务MDP定义</p>
+</blockquote>
+<h3 id="observations.py">observations.py</h3>
+<p>Mjlab provides common terms in <code>mjlab.envs.mdp</code> (joint
+positions, velocities, etc.), but you can always define your own. This
+is the one custom observation function:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">pole_angle_cos_sin</span>(<span class="params">env, asset_cfg</span>) -&gt; torch.Tensor:</span><br><span class="line">    asset: Entity = env.scene[asset_cfg.name]</span><br><span class="line">    angle = asset.data.joint_pos[:, asset_cfg.joint_ids]</span><br><span class="line">    <span class="keyword">return</span> torch.cat([torch.cos(angle), torch.sin(angle)], dim=-<span class="number">1</span>)</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>MuJoCo's unlimited hinge does not wrap the angle, so as the pole
+spins the raw value keeps growing. Cosine and sine give the same output
+for the same physical angle regardless of how many rotations have
+occurred.</p>
+<p>All data in mjlab is batched: tensors have shape
+<code>[num_envs, ...]</code> because many environments run in parallel.
+Every function you write should accept and return tensors with this
+leading batch dimension.</p>
+</blockquote>
+<p>When a term needs to cache setup work or maintain per-episode state,
+implement it as a class with <code>init(self, cfg, env)</code> and
+<code>call(self, env, ...)</code>. If the class has a
+<code>reset(env_ids)</code> method, the manager calls it automatically
+on episode resets. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#env-config-term-pattern">Term
+configuration pattern</a> for the general pattern.</p>
+<h3 id="rewards.py">rewards.py</h3>
+<p>类似于observation，在该文件中自定义不同类型的reward计算函数，在<em>&lt;task&gt;_env_cfg.py</em>中组装。</p>
+<p>A reward function accepts <code>env</code> as its first argument and
+returns a <code>[num_envs]</code> tensor. Additional parameters are
+declared as function arguments and supplied via
+<code>RewardTermCfg(params=&#123;...&#125;)</code>. When a term needs to cache
+setup work or maintain per-episode state, implement it as a class. See
+<a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#env-config-term-pattern">Term
+configuration pattern</a> for the general pattern.</p>
+<h3 id="terminations.py">terminations.py</h3>
+<p>同Reward和Observation。</p>
+<p>Custom termination functions follow the same patterns as reward
+functions. A plain function accepts <code>env</code> and returns a
+boolean <code>[num_envs]</code> tensor. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#env-config-term-pattern">Term
+configuration pattern</a> for the general pattern.</p>
+<h3 id="commands.py">commands.py</h3>
+<p>同上。</p>
+<p>A custom command term is a class inheriting from
+<code>CommandTerm</code> paired with a configuration dataclass
+inheriting from <code>CommandTermCfg</code>. The term must implement
+four methods: <code>_resample_command(env_ids)</code> to sample new
+goals, <code>_update_command()</code> for per-step updates,
+<code>_update_metrics()</code> for logging, and a <code>command</code>
+property returning the current goal tensor. The base class manages the
+resampling timer and resets logic automatically.</p>
+<p>The configuration must implement a <code>build(env)</code> method
+that constructs the paired term instance.</p>
+<h3 id="events.py">events.py</h3>
+<p>同上。</p>
+<p>An event function takes <code>env</code> and <code>env_ids</code> as
+its first two arguments and any additional parameters from
+<code>EventTermCfg.params</code>. It modifies simulation state in place
+and returns nothing. For terms that need expensive one-time setup (such
+as loading data from disk), use a class so that the setup runs once at
+construction rather than on every call. For example, the following
+custom event term resets the robot to a random pose sampled from a
+pre-recorded dataset:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> torch</span><br><span class="line"><span class="keyword">from</span> mjlab.managers.manager_base <span class="keyword">import</span> ManagerTermBase</span><br><span class="line"><span class="keyword">from</span> mjlab.managers.scene_entity_config <span class="keyword">import</span> SceneEntityCfg</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ResetFromDataset</span>(<span class="title class_ inherited__">ManagerTermBase</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Reset the robot to a random pose from a dataset.&quot;&quot;&quot;</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, cfg, env</span>):</span><br><span class="line">        <span class="built_in">super</span>().__init__(env)</span><br><span class="line">        <span class="variable language_">self</span>._robot = env.scene[<span class="string">&quot;robot&quot;</span>]</span><br><span class="line">        <span class="variable language_">self</span>._poses = torch.load(</span><br><span class="line">            cfg.params[<span class="string">&quot;dataset_path&quot;</span>],</span><br><span class="line">            map_location=env.device,</span><br><span class="line">        )</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__call__</span>(<span class="params">self, env, env_ids, **kwargs</span>):</span><br><span class="line">        <span class="comment"># Sample with replacement: each env gets an independent pose.</span></span><br><span class="line">        indices = torch.randint(</span><br><span class="line">            <span class="built_in">len</span>(<span class="variable language_">self</span>._poses), (<span class="built_in">len</span>(env_ids),), device=env.device,</span><br><span class="line">        )</span><br><span class="line">        <span class="variable language_">self</span>._robot.write_joint_position_to_sim(</span><br><span class="line">            <span class="variable language_">self</span>._poses[indices], env_ids=env_ids,</span><br><span class="line">        )</span><br></pre></td></tr></table></figure>
+<p>When a term needs to maintain state or perform expensive setup,
+implement it as a class. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#env-config-term-pattern">Term
+configuration pattern</a> for the general pattern. For custom DR terms
+that write to model fields, see <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/randomization.html#domain-randomization">Domain
+Randomization</a>.</p>
+<p>Each <code>dr</code> function is decorated with
+<code>@requires_model_fields</code> which automatically tracks the
+fields that need to be expanded for per-world storage
+<strong>and</strong> the <code>RecomputeLevel</code> needed to keep <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/randomization.html#dr-recomputation">derived
+quantities</a> consistent.</p>
+<h3 id="curriculums.py">curriculums.py</h3>
+<p>A curriculum function accepts <code>env</code> and
+<code>env_ids</code>, applies parameter changes, and returns a value to
+log (a scalar tensor, a dict of tensors, or <code>None</code>). A
+typical implementation reads a performance metric, decides whether to
+increase or decrease difficulty, mutates the relevant configuration in
+place, and returns the current difficulty level. See <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/environment_config.html#env-config-term-pattern">Term
+configuration pattern</a> for the general pattern.</p>
+<h3 id="metrics.py">metrics.py</h3>
+<p>A metric function follows the same pattern as reward and observation
+functions. It takes the environment as its first argument, reads
+whatever state it needs, and returns a <code>[num_envs]</code>
+tensor.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> torch</span><br><span class="line"><span class="keyword">from</span> mjlab.envs <span class="keyword">import</span> ManagerBasedRlEnv</span><br><span class="line"><span class="keyword">from</span> mjlab.managers.scene_entity_config <span class="keyword">import</span> SceneEntityCfg</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">base_height</span>(<span class="params"></span></span><br><span class="line"><span class="params">    env: ManagerBasedRlEnv,</span></span><br><span class="line"><span class="params">    asset_cfg: SceneEntityCfg = SceneEntityCfg(<span class="params"><span class="string">&quot;robot&quot;</span></span>),</span></span><br><span class="line"><span class="params"></span>) -&gt; torch.Tensor:</span><br><span class="line">    robot = env.scene[asset_cfg.name]</span><br><span class="line">    <span class="keyword">return</span> robot.data.root_link_pos_w[:, <span class="number">2</span>]</span><br></pre></td></tr></table></figure>
+<p>For metrics that require cached setup or per-episode state, implement
+the term as a class with <code>init(self, cfg, env)</code> and a
+<code>call</code> method. If the class defines a
+<code>reset(env_ids)</code> method, the manager calls it automatically
+on episode resets.</p>
+<h2 id="rl">RL</h2>
+<blockquote>
+<p>自定义强化学习算法</p>
+</blockquote>
+<h3 id="runner.py">runner.py</h3>
+<ul>
+<li>修改策略导出位置Tasks</li>
+</ul>
+<h2 id="task_env_cfg.py">&lt;task&gt;_env_cfg.py</h2>
+<blockquote>
+<p>任务主环境装配函数</p>
+</blockquote>
+<h3 id="sensors">Sensors</h3>
+<h3 id="observations">Observations</h3>
+<p>Each observation term is a function that reads from the simulation
+and returns a tensor （定义在mdp文件夹中的<em>observations.py</em>中）.
+The observation manager concatenates them into a single vector for the
+policy. To wire these up, we create <code>ObservationTermCfg</code>
+entries and group them. <code>SceneEntityCfg</code> scopes each function
+to specific joints on the entity:</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">cart_cfg = SceneEntityCfg(<span class="string">&quot;cartpole&quot;</span>, joint_names=(<span class="string">&quot;slider&quot;</span>,))</span><br><span class="line">hinge_cfg = SceneEntityCfg(<span class="string">&quot;cartpole&quot;</span>, joint_names=(<span class="string">&quot;hinge_1&quot;</span>,))</span><br><span class="line"></span><br><span class="line">cart_pos = ObservationTermCfg(</span><br><span class="line">    <span class="function"><span class="keyword">func</span>=<span class="title">joint_pos_rel</span>, <span class="title">params</span>=</span>&#123;<span class="string">&quot;asset_cfg&quot;</span>: cart_cfg&#125;,</span><br><span class="line">)</span><br><span class="line">pole_angle = ObservationTermCfg(</span><br><span class="line">    <span class="function"><span class="keyword">func</span>=<span class="title">pole_angle_cos_sin</span>, <span class="title">params</span>=</span>&#123;<span class="string">&quot;asset_cfg&quot;</span>: hinge_cfg&#125;,</span><br><span class="line">)</span><br><span class="line">cart_vel = ObservationTermCfg(</span><br><span class="line">    <span class="function"><span class="keyword">func</span>=<span class="title">joint_vel_rel</span>, <span class="title">params</span>=</span>&#123;<span class="string">&quot;asset_cfg&quot;</span>: cart_cfg&#125;,</span><br><span class="line">)</span><br><span class="line">pole_vel = ObservationTermCfg(</span><br><span class="line">    <span class="function"><span class="keyword">func</span>=<span class="title">joint_vel_rel</span>, <span class="title">params</span>=</span>&#123;<span class="string">&quot;asset_cfg&quot;</span>: hinge_cfg&#125;,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>每一项可以添加噪声：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">&quot;joint_vel&quot;</span>: ObservationTermCfg(</span><br><span class="line">    func=mdp.joint_vel_rel,</span><br><span class="line">    noise=Unoise(n_min=-<span class="number">1.5</span>, n_max=<span class="number">1.5</span>)</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>Each term pairs a function with the parameters to call it with. Now
+we group them. The RL algorithm expects an <code>"actor"</code> and
+<code>"critic"</code> group</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">actor_terms = <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;cart_pos&quot;</span><span class="punctuation">:</span> cart_pos<span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;pole_angle&quot;</span><span class="punctuation">:</span> pole_angle<span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;cart_vel&quot;</span><span class="punctuation">:</span> cart_vel<span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;pole_vel&quot;</span><span class="punctuation">:</span> pole_vel<span class="punctuation">,</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br><span class="line"></span><br><span class="line">observations = <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;actor&quot;</span><span class="punctuation">:</span> ObservationGroupCfg(actor_terms)<span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;critic&quot;</span><span class="punctuation">:</span> ObservationGroupCfg(<span class="punctuation">&#123;</span>**actor_terms<span class="punctuation">&#125;</span>)<span class="punctuation">,</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+<p>By default, term outputs within a group are concatenated along the
+last dimension into a single <code>[num_envs, D]</code> tensor. Set
+<code>concatenate_terms=False</code> to receive a dict mapping term
+names to individual tensors instead.</p>
+<p>The actor group contains only the observations that would be
+available on real hardware; the critic group can include privileged
+simulation state that is only accessible during training. The
+<code>enable_corruption</code> flag gates noise application for the
+entire group: when <code>False</code>, noise configs on individual terms
+are ignored. This makes it straightforward to share term definitions
+between a noisy actor group and a noise-free critic group, as shown in
+the <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/observations.html#obs-asymmetric">asymmetric
+actor-critic</a> section below.</p>
+<p>History and delay can also be set at the group level to apply
+uniformly across all terms</p>
+<h3 id="actions">Actions</h3>
+<p>Actions define how the policy controls the simulation. The action
+manager receives the policy's output tensor each step, splits it across
+registered action terms, and routes each slice to the appropriate
+entity's actuators. Each term maps a contiguous segment of the policy
+output to a control mode (position, velocity, effort) on a set of
+joints, tendons, or sites.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.envs.mdp.actions <span class="keyword">import</span> JointPositionActionCfg</span><br><span class="line"></span><br><span class="line">actions = &#123;</span><br><span class="line">    <span class="string">&quot;joint_pos&quot;</span>: JointPositionActionCfg(</span><br><span class="line">        entity_name=<span class="string">&quot;robot&quot;</span>,</span><br><span class="line">        actuator_names=(<span class="string">&quot;.*&quot;</span>,),   <span class="comment"># regex matching actuator names</span></span><br><span class="line">        scale=<span class="number">0.5</span>,</span><br><span class="line">        use_default_offset=<span class="literal">True</span>,  <span class="comment"># action 0 = default pose</span></span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="rewards">Rewards</h3>
+<p>The reward manager computes a weighted sum of all terms and returns
+it to the training framework.</p>
+<p>Each term is registered by name with a <code>RewardTermCfg</code>
+that carries the callable and a <code>weight</code>. Negative weights
+produce penalties. Additional keyword arguments are supplied through
+<code>params</code>.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.envs.mdp <span class="keyword">import</span> rewards</span><br><span class="line"><span class="keyword">from</span> mjlab.managers.reward_manager <span class="keyword">import</span> RewardTermCfg</span><br><span class="line"><span class="keyword">from</span> mjlab.managers.scene_entity_config <span class="keyword">import</span> SceneEntityCfg</span><br><span class="line"></span><br><span class="line">rewards_cfg = &#123;</span><br><span class="line">    <span class="string">&quot;alive&quot;</span>: RewardTermCfg(func=rewards.is_alive, weight=<span class="number">1.0</span>),</span><br><span class="line">    <span class="string">&quot;joint_torques&quot;</span>: RewardTermCfg(</span><br><span class="line">        func=rewards.joint_torques_l2,</span><br><span class="line">        weight=-<span class="number">1e-4</span>,</span><br><span class="line">        params=&#123;<span class="string">&quot;asset_cfg&quot;</span>: SceneEntityCfg(<span class="string">&quot;robot&quot;</span>)&#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>ManagerBasedRlEnvCfg.scale_rewards_by_dt</code> is
+<code>True</code> by default. When enabled, the reward manager
+multiplies each term by the environment step duration before
+accumulating it. This makes episodic reward totals invariant to
+simulation frequency: a task running at 50 Hz produces the same expected
+episode return as the same task at 200 Hz, because each step contributes
+proportionally less to the total.</p>
+<p>Per-term episodic sums are logged as
+<code>Episode_Reward/&lt;term_name&gt;</code> and are always divided by
+the episode duration, giving a reward rate that is comparable across
+runs with different episode lengths.</p>
+<h3 id="terminations">Terminations</h3>
+<p>Setting <code>time_out=True</code> marks the condition as a
+truncation rather than a terminal failure. Truncations map to the
+<code>truncated</code> signal in the Gym interface; failures map to
+<code>terminated</code>. This distinction matters for value
+bootstrapping: the agent should estimate future value beyond a
+truncation but not beyond a failure.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.envs.mdp <span class="keyword">import</span> terminations</span><br><span class="line"><span class="keyword">from</span> mjlab.managers.termination_manager <span class="keyword">import</span> TerminationTermCfg</span><br><span class="line"></span><br><span class="line">terminations_cfg = &#123;</span><br><span class="line">    <span class="string">&quot;time_out&quot;</span>: TerminationTermCfg(</span><br><span class="line">        func=terminations.time_out, time_out=<span class="literal">True</span>,</span><br><span class="line">    ),</span><br><span class="line">    <span class="string">&quot;fallen&quot;</span>: TerminationTermCfg(</span><br><span class="line">        func=terminations.bad_orientation,</span><br><span class="line">        params=&#123;<span class="string">&quot;limit_angle&quot;</span>: <span class="number">1.0</span>&#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="commands">Commands</h3>
+<p>Commands specify what the policy should achieve at each moment: a
+target velocity, a reference trajectory, a goal position. The command
+manager generates these signals, resamples them at configurable
+intervals, and passes them to the policy through the observation
+system.</p>
+<p>The <code>resampling_time_range</code> field controls how often the
+command changes. After each resample the term draws a new timer value
+uniformly from the given <code>(min, max)</code> range in seconds.
+Commands are also resampled unconditionally on every episode reset.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">commands = &#123;</span><br><span class="line">    <span class="string">&quot;twist&quot;</span>: UniformVelocityCommandCfg(</span><br><span class="line">        entity_name=<span class="string">&quot;robot&quot;</span>,</span><br><span class="line">        resampling_time_range=(<span class="number">3.0</span>, <span class="number">8.0</span>),</span><br><span class="line">        ranges=UniformVelocityCommandCfg.Ranges(</span><br><span class="line">            lin_vel_x=(-<span class="number">1.0</span>, <span class="number">1.0</span>),</span><br><span class="line">            lin_vel_y=(-<span class="number">1.0</span>, <span class="number">1.0</span>),</span><br><span class="line">            ang_vel_z=(-<span class="number">0.5</span>, <span class="number">0.5</span>),</span><br><span class="line">        ),</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="events">Events</h3>
+<p>The event manager executes hooks at specific points in the
+environment lifecycle. Any logic that should run at startup, on episode
+reset, or at regular intervals during training is registered as an event
+term. Common examples include resetting entities to an initial state,
+applying domain randomization to model parameters, pushing the robot
+with random velocity perturbations, and initializing robot state from a
+reference motion clip. All of these are configured through the same
+<code>EventTermCfg</code> interface, differing only in the
+<code>mode</code> field that controls when each term fires.</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line">from mjlab.envs.mdp <span class="keyword">import</span> events as event_fns, dr</span><br><span class="line">from mjlab.managers.event_manager <span class="keyword">import</span> EventTermCfg</span><br><span class="line">from mjlab.managers.scene_entity_config <span class="keyword">import</span> SceneEntityCfg</span><br><span class="line"></span><br><span class="line">events = &#123;</span><br><span class="line">    # Reset all entities to their <span class="keyword">default</span> state each episode.</span><br><span class="line">    <span class="string">&quot;reset_scene&quot;</span>: EventTermCfg(</span><br><span class="line">        <span class="function"><span class="keyword">func</span>=<span class="title">event_fns</span>.<span class="title">reset_scene_to_default</span>,</span></span><br><span class="line">        mode=<span class="string">&quot;reset&quot;</span>,</span><br><span class="line">    ),</span><br><span class="line">    # Randomize foot friction once at startup.</span><br><span class="line">    <span class="string">&quot;foot_friction&quot;</span>: EventTermCfg(</span><br><span class="line">        <span class="function"><span class="keyword">func</span>=<span class="title">dr</span>.<span class="title">geom_friction</span>,</span></span><br><span class="line">        mode=<span class="string">&quot;startup&quot;</span>,</span><br><span class="line">        params=&#123;</span><br><span class="line">            <span class="string">&quot;asset_cfg&quot;</span>: SceneEntityCfg(<span class="string">&quot;robot&quot;</span>, geom_names=[<span class="string">&quot;.*foot.*&quot;</span>]),</span><br><span class="line">            <span class="string">&quot;ranges&quot;</span>: (<span class="number">0.3</span>, <span class="number">1.2</span>),</span><br><span class="line">            <span class="string">&quot;operation&quot;</span>: <span class="string">&quot;abs&quot;</span>,</span><br><span class="line">        &#125;,</span><br><span class="line">    ),</span><br><span class="line">    # Push the robot at random intervals during the episode.</span><br><span class="line">    <span class="string">&quot;push_robot&quot;</span>: EventTermCfg(</span><br><span class="line">        <span class="function"><span class="keyword">func</span>=<span class="title">event_fns</span>.<span class="title">push_by_setting_velocity</span>,</span></span><br><span class="line">        mode=<span class="string">&quot;interval&quot;</span>,</span><br><span class="line">        interval_range_s=(<span class="number">1.0</span>, <span class="number">3.0</span>),</span><br><span class="line">        params=&#123;</span><br><span class="line">            <span class="string">&quot;velocity_range&quot;</span>: &#123;<span class="string">&quot;x&quot;</span>: (<span class="number">-0.5</span>, <span class="number">0.5</span>), <span class="string">&quot;y&quot;</span>: (<span class="number">-0.5</span>, <span class="number">0.5</span>)&#125;,</span><br><span class="line">        &#125;,</span><br><span class="line">    ),</span><br><span class="line">    # Transient random impulses with duration and cooldown.</span><br><span class="line">    <span class="string">&quot;impulse&quot;</span>: EventTermCfg(</span><br><span class="line">        <span class="function"><span class="keyword">func</span>=<span class="title">event_fns</span>.<span class="title">apply_body_impulse</span>,</span></span><br><span class="line">        mode=<span class="string">&quot;step&quot;</span>,</span><br><span class="line">        params=&#123;</span><br><span class="line">            <span class="string">&quot;force_range&quot;</span>: (<span class="number">-50.0</span>, <span class="number">50.0</span>),</span><br><span class="line">            <span class="string">&quot;torque_range&quot;</span>: (<span class="number">0.0</span>, <span class="number">0.0</span>),</span><br><span class="line">            <span class="string">&quot;duration_s&quot;</span>: (<span class="number">0.1</span>, <span class="number">0.2</span>),</span><br><span class="line">            <span class="string">&quot;cooldown_s&quot;</span>: (<span class="number">1.0</span>, <span class="number">3.0</span>),</span><br><span class="line">            <span class="string">&quot;asset_cfg&quot;</span>: SceneEntityCfg(<span class="string">&quot;robot&quot;</span>, body_names=(<span class="string">&quot;base&quot;</span>,)),</span><br><span class="line">        &#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="curriculms">Curriculms</h3>
+<p>The curriculum manager adjusts training conditions based on policy
+performance. Training begins with an easier problem and difficulty
+increases as the policy demonstrates it can handle the current
+conditions. Common uses include advancing robots to harder terrain,
+widening command velocity ranges, and ramping reward penalty weights
+over the course of training.</p>
+<p>Curriculum terms are called at each environment reset. Each term
+receives the environment and the set of resetting environment IDs,
+examines some performance signal, and applies changes to environment
+parameters directly.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.managers.curriculum_manager <span class="keyword">import</span> CurriculumTermCfg</span><br><span class="line"></span><br><span class="line">curriculum = &#123;</span><br><span class="line">    <span class="string">&quot;terrain_levels&quot;</span>: CurriculumTermCfg(</span><br><span class="line">        func=mdp.terrain_levels_vel,</span><br><span class="line">        params=&#123;<span class="string">&quot;command_name&quot;</span>: <span class="string">&quot;twist&quot;</span>&#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The return value of a curriculum function is logged under
+<code>Curriculum/&lt;term_name&gt;</code> in the training metrics.</p>
+<h3 id="metrics">Metrics</h3>
+<p>The metrics manager logs per-step scalar values as episode averages.
+Unlike rewards, metrics carry no weight and are not scaled by the step
+duration. They exist purely for diagnostics: tracking quantities such as
+tracking error, contact forces, or energy consumption alongside reward
+curves without influencing the optimization.</p>
+<p>Metrics are computed every environment step, accumulated per
+environment, and averaged over the episode length when the environment
+resets. The resulting averages are written to the training logger
+(TensorBoard or Weights &amp; Biases) under the
+<code>Episode_Metrics/</code> prefix.</p>
+<p>If the <code>metrics</code> dictionary on
+<code>ManagerBasedRlEnvCfg</code> is empty, the environment substitutes
+a lightweight no-op manager with zero overhead.</p>
+<p>The configuration is minimal: a callable and an optional
+<code>params</code> dictionary.</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.managers.metrics_manager <span class="keyword">import</span> MetricsTermCfg</span><br><span class="line"></span><br><span class="line">metrics = &#123;</span><br><span class="line">    <span class="string">&quot;base_height&quot;</span>: MetricsTermCfg(</span><br><span class="line">        func=base_height,</span><br><span class="line">        params=&#123;<span class="string">&quot;asset_cfg&quot;</span>: SceneEntityCfg(<span class="string">&quot;robot&quot;</span>)&#125;,</span><br><span class="line">    ),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>The callable receives <code>env</code> as its first argument and any
+entries in <code>params</code> as keyword arguments. It must return a
+tensor of shape <code>[num_envs]</code>, one scalar per environment per
+step.</p>
+<h3 id="env">Env</h3>
+<p><code>ManagerBasedRlEnvCfg</code> is where all the pieces come
+together. The scene holds the entity, and the config holds everything
+else:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">return</span> ManagerBasedRlEnvCfg(</span><br><span class="line">    scene=SceneCfg(</span><br><span class="line">        terrain=TerrainEntityCfg(terrain_type=<span class="string">&quot;plane&quot;</span>),</span><br><span class="line">        entities=&#123;<span class="string">&quot;cartpole&quot;</span>: _get_cartpole_cfg(swing_up=swing_up)&#125;,</span><br><span class="line">        num_envs=<span class="number">1</span>,</span><br><span class="line">        env_spacing=<span class="number">4.0</span>,</span><br><span class="line">    ),</span><br><span class="line">    observations=observations,</span><br><span class="line">    actions=actions,</span><br><span class="line">    events=events,</span><br><span class="line">    rewards=rewards,</span><br><span class="line">    terminations=terminations,</span><br><span class="line">    sim=SimulationCfg(</span><br><span class="line">        mujoco=MujocoCfg(timestep=<span class="number">0.01</span>, disableflags=(<span class="string">&quot;contact&quot;</span>,)),</span><br><span class="line">    ),</span><br><span class="line">    decimation=<span class="number">5</span>,</span><br><span class="line">    episode_length_s=<span class="number">50.0</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p><code>decimation=5</code> means the physics runs five substeps per
+policy step, giving a 20 Hz control frequency.
+<code>disableflags=("contact",)</code> skips contact computation since
+cartpole has no collisions. <code>num_envs=1</code> is the default;
+override it from the CLI with <code>--num-envs</code>.</p>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

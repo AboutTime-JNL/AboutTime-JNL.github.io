@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>强化学习—方法梳理（Reinforcement Learning — Methods Overview） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>强化学习—方法梳理（Reinforcement Learning — Methods Overview）</h1>
+  <div class="meta">发布于：2026-02-01</div>
+  
+  <div class="content">
+    <ul>
+<li><p>目标：针对MDP问题求解最优策略，写为Bellman最优公式<span
+class="math inline">\(\begin{align}
+v=\max_\pi(r_\pi+P_\pi v),\ \forall s\in\mathcal{S}
+\end{align}\)</span></p></li>
+<li><p>其求解思路总体分为两部分：</p>
+<ul>
+<li><p>策略评估：计算Action对应的Action Value<span
+class="math inline">\(q(s,a)\)</span></p></li>
+<li><p>策略改进：根据Action Value调整策略<span
+class="math inline">\(\pi\)</span></p></li>
+</ul></li>
+</ul>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>方法</th>
+<th>策略评估</th>
+<th>策略改进</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>策略迭代（有模型）</td>
+<td><span class="math inline">\(q_\pi(s,a)=\sum_r
+p(r|s,a)r+\sum_{s&#39;} p(s&#39;|s,a)\sum_{a&#39;}
+\pi(a&#39;|s&#39;)q_\pi
+(s&#39;,a&#39;)\)</span><br>不动点法求解，但是变量过多，因此先通过Bellman方程计算中间变量State
+Value，再计算Action
+Value<br>注：不动点法可以设置迭代次数人为截断，提高速度</td>
+<td><span class="math inline">\(\pi(a|s)=\max_a
+q_\pi(s,a)\)</span><br>选择最大的Action Value作为策略</td>
+</tr>
+<tr class="even">
+<td>蒙特卡罗法（无模型）</td>
+<td>p未知，对每个<span
+class="math inline">\((s,a)\)</span>采样m个episodes，每个episode包含n个时间步，估计Action
+Value</td>
+<td>同上</td>
+</tr>
+<tr class="odd">
+<td>时序差分法（Sarsa）</td>
+<td>蒙特卡罗法每次policy更新后需要重新大量采样计算，历史数据没有复用。随机近似提供了一种利用历史数据的方法：<br><span
+class="math inline">\(\omega^\ast=\mathbb{E}_\pi[X]&lt;br&gt;\\&lt;br&gt;\omega_{k+1}=\omega_k-\alpha_k(\omega_k-x_k),\
+x_k\sim \pi(x)&lt;br&gt;\\&lt;br&gt;\omega_{k+1} \to \omega_\ast,\ when\
+k\to \infin\)</span><br>因此:<br><span class="math inline">\(q_\pi
+(s,a)=\mathbb{E} [R+q_\pi
+(S&#39;,A&#39;)]&lt;br&gt;\\&lt;br&gt;q_{k+1}(s_t, a_t) = q_k(s_t, a_t)
+- \alpha_k [q_k(s_t, a_t) - [r_{t+1} + q_k(s_{t+1}, a_{t+1})]],
+&lt;br&gt;\\&lt;br&gt;q_{k+1}(s, a) = q_k(s, a), \quad \forall (s, a)
+\neq (s_t, a_t)\)</span></td>
+<td>同上</td>
+</tr>
+<tr class="even">
+<td>Q-learning</td>
+<td>Sarsa算法是先估计策略<span
+class="math inline">\(\pi\)</span>下的Action
+Value，再策略改进，每次迭代需要重新采样（每次策略采样之间串行工作），交替进行，效率低。Q-learning直接估计最优策略对应的Action
+Value，一方面提高收敛速度，另一方面实现Off-policy训练（<span
+class="math inline">\(S&#39;\)</span>的分布与策略无关），策略改进过程中不需要重新采样（允许并行批量采样）。根据Bellman最优公式写Action
+Value的期望形式：<br><span class="math inline">\(q(s,a)=\mathbb{E}
+[R+\max_{a&#39;} q (S&#39;,a&#39;)]&lt;br&gt;\\&lt;br&gt;q_{k+1}(s_t,
+a_t) = q_k(s_t, a_t) - \alpha_k [q_k(s_t, a_t) - [r_{t+1} +
+\max_{a&#39;} q_k(s_{t+1}, a&#39;)]], &lt;br&gt;\\&lt;br&gt;q_{k+1}(s,
+a) = q_k(s, a), \quad \forall (s, a) \neq (s_t, a_t)\)</span></td>
+<td>同上，但是策略评估和策略改进不再需要交替进行，可以最优策略评估完成后再改进</td>
+</tr>
+<tr class="odd">
+<td>Deep Q-learning</td>
+<td>表格形式的Action Value无法解决状态<span
+class="math inline">\(S\)</span>或者动作<span
+class="math inline">\(A\)</span>任意一者变为连续的问题（表格之外无法找到对应的Action
+Value），因此Action
+Value调整为函数形式。采用随机梯度下降来估计函数形式的Action
+Value：<br><span class="math inline">\(J(\omega)=\mathbb{E}
+[(q(S,\omega)-R-\max_{a&#39;} q
+(S&#39;,a&#39;))^2]&lt;br&gt;\\&lt;br&gt;\omega_{k+1} = \omega_k -
+\alpha_k [q(s_t, a_t,\omega_k) - [r_{t+1} + \max_{a&#39;} q(s_{t+1},
+a&#39;,\omega_k)]]\nabla_\omega
+q(s_t,a_t,\omega_k)\)</span><br>相比于Off-policy版本的Q-learning，DQL的action
+value是联动的，因此期望形式中增加了一个随机变量S。<strong>若假设S均匀分布，对于训练数据需要打散后重新采样；</strong>若假设S策略分布，则DQL转变为On-policy方法。<br>Sarsa以及Q-learning在计算过程中都用<span
+class="math inline">\(q_k\)</span>取代了期望公式中的<span
+class="math inline">\(q_\pi\)</span>，因此策略估计为<strong>有偏估计</strong>，且偏置动态变化影响收敛。对此，Deep
+Q-learning提出目标网络和训练网络，即在一定迭代次数中<span
+class="math inline">\(q_\pi\)</span>采用固定<span
+class="math inline">\(q_k\)</span>（目标网络），延迟学习。</td>
+<td><span class="math inline">\(a=\max_{a} q(s,
+a,\omega)\)</span><br>与表格形式的Action
+Value不同：<br>对于离散Action，需要将每个Action代入寻找最优解<br>对于连续Action，需要解最优化问题<br></td>
+</tr>
+<tr class="even">
+<td>DQL<br>+<br>策略梯度<br>=Actor-Critic</td>
+<td>同上</td>
+<td>DQL等算法求得Action
+Value后再通过最优化得到Action，效率低。因此策略梯度直接同时优化策略函数<span
+class="math inline">\(\pi(\theta):S\to
+A\)</span>。根据随机梯度下降得到：<br>定义指标<span
+class="math inline">\(J=\sum_{s\in
+S}d(s)v_\pi(s)\)</span><br>推导梯度<span
+class="math inline">\(\nabla_\theta J=\mathbb{E}[\nabla_\theta
+\ln\pi(A|S,\theta)q_\pi(S,A)]\)</span><br><span
+class="math inline">\(\theta_{k+1}=\theta_k+\alpha_k\nabla_\theta\ln\pi(a_t|s_t,\theta_k)q_k(s_t,a_t)\)</span><br>由于期望公式中包含以策略为分布的随机变量Action，因此该方法为On-policy。同时此处也包含随机变量S，与策略评估相同，也需要假设S分布。</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td>DPG</td>
+<td>同上</td>
+<td>策略网络建立了State和Action之间的联系，之前采用分类网络输出每个Action的概率，非确定性策略。若为确定性策略，网络输出Action，Action与State为确定映射，不再为随机变量，梯度相应变化。</td>
+</tr>
+</tbody>
+</table>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

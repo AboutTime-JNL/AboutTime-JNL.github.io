@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——Actuator（Mjlab Learning - Actuator） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——Actuator（Mjlab Learning - Actuator）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <p>该目录实现执行器抽象与具体执行器模型，负责把策略输出或控制命令转换为仿真可执行的驱动输入，包含通用执行器接口、内置电机/位置/速度执行器、PD
+与直流电机模型、可学习执行器以及基于 XML 的执行器配置封装。</p>
+<p>They are configured through the <code>articulation</code> field of <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/entity/index.html#entity">EntityCfg</a>.
+mjlab provides <strong>built-in</strong> actuators that leverage the
+physics engine's implicit integration for best stability, and
+<strong>explicit</strong> actuators for custom control laws and actuator
+dynamics.</p>
+<ul>
+<li><p>actuator.py：基类。定义了
+TransmissionType（JOINT/TENDON/SITE）、配置基类 ActuatorCfg、命令结构
+ActuatorCmd，以及抽象类 Actuator。Actuator 负责：目标索引管理、spec
+编辑生命周期、初始化 ctrl 索引、命令延迟缓冲（DelayBuffer）、从
+EntityData 抽取命令 (<code>get_command()</code>)、以及统一的
+<code>reset()/update()</code> 钩子。<br />
+All actuator configs share a few common fields inherited from
+<code>ActuatorCfg</code>:</p>
+<ul>
+<li><p><code>target_names_expr</code>: Tuple of regex patterns matched
+against joint names (or tendon/site names when using a different
+<code>transmission_type</code>).</p></li>
+<li><p><code>armature</code>: Reflected rotor inertia added to the
+target joint.</p></li>
+<li><p><code>frictionloss</code>: Static friction (stiction) modeled as
+a constraint on the target joint.</p></li>
+</ul></li>
+<li><p>builtin_actuator.py：实现“直接调用 MuJoCo 原生 actuator
+元素”的几类执行器与配置：BuiltinPositionActuator、BuiltinVelocityActuator、BuiltinMotorActuator、BuiltinMuscleActuator。它们在<code>edit_spec()</code>阶段往
+MjSpec 里批量创建
+&lt;position&gt;/&lt;velocity&gt;/&lt;motor&gt;/&lt;muscle&gt;，在
+compute() 阶段多数是直通目标值。<br />
+Any actuator config supports inline delay fields for modeling command
+latency. Actuator delay models this: the command target is delayed, but
+the control law still sees fresh joint state.<br />
+This is distinct from observation delay, which models sensor pipeline
+latency (stale state going into the policy). Together they cover both
+legs of the round trip: sensor to policy to motor.<br />
+Each step, a lag is sampled uniformly from
+<code>[delay_min_lag,delay_max_lag]</code>. Delays are quantized to
+physics timesteps.</p></li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> mjlab.actuator <span class="keyword">import</span> IdealPdActuatorCfg</span><br><span class="line"></span><br><span class="line"><span class="comment"># Add 2-5 step delay to position commands.</span></span><br><span class="line">actuators = (</span><br><span class="line">    IdealPdActuatorCfg(</span><br><span class="line">        target_names_expr=(<span class="string">&quot;.*&quot;</span>,),</span><br><span class="line">        stiffness=<span class="number">80.0</span>,</span><br><span class="line">        damping=<span class="number">10.0</span>,</span><br><span class="line">        delay_min_lag=<span class="number">2</span>,</span><br><span class="line">        delay_max_lag=<span class="number">5</span>,</span><br><span class="line">        delay_hold_prob=<span class="number">0.3</span>,         <span class="comment"># 30% chance to keep current lag</span></span><br><span class="line">        delay_update_period=<span class="number">10</span>,      <span class="comment"># Resample lag every 10 steps</span></span><br><span class="line">    ),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>builtin_group.py：BuiltinActuatorGroup
+会把内置执行器按“类型+传动类型”分组，合并成批量索引写入
+ctrl，避免逐执行器循环；对具有相同延迟参数的内置执行器，还会融合为共享
+_FusedDelayGroup 和共享延迟缓冲。作用是减少 Python
+开销、提升多环境并行效率。</p></li>
+<li><p>Explicit Actuator</p>
+<p>The key design decision when configuring actuators is whether to use
+<strong>built-in</strong> or <strong>explicit</strong> types. The
+difference comes down to how MuJoCo’s integrator handles
+velocity-dependent forces.</p>
+<p><strong>Built-in actuators</strong>
+(<code>BuiltinPositionActuator</code>,
+<code>BuiltinVelocityActuator</code>, <code>BuiltinMotorActuator</code>,
+<code>BuiltinMuscleActuator</code>) create native MuJoCo actuator
+elements in the MjSpec. The physics engine computes the control law and
+integrates velocity-dependent damping forces implicitly. This provides
+the best numerical stability, particularly with high gains or large
+timesteps.</p>
+<p><strong>Explicit actuators</strong> (<code>IdealPdActuator</code>,
+<code>DcMotorActuator</code>, <code>LearnedMlpActuator</code>) compute
+torques in user code and forward them through a
+<code>&lt;motor&gt;</code> actuator acting as a passthrough. Because the
+integrator cannot account for the velocity derivatives of these
+externally computed forces, they are less numerically robust than
+built-in types. Use explicit actuators when you need custom control laws
+or actuator dynamics that cannot be expressed with built-in types (e.g.,
+velocity-dependent torque limits, learned actuator networks).</p>
+<p>The two approaches match closely in the linear, unconstrained regime
+at small timesteps. At larger timesteps or higher gains, built-in
+actuators are more forgiving.</p>
+<p><strong>Integrator choice.</strong> mjlab places damping inside the
+actuator rather than in joints. The <code>euler</code> integrator treats
+joint damping implicitly but actuator damping explicitly, limiting
+stability. The <code>implicitfast</code> integrator treats all known
+velocity-dependent forces implicitly, handling both proportional and
+damping terms of the actuator without additional cost.</p>
+<ul>
+<li><p>pd_actuator.py：提供
+IdealPdActuator。它在<code>compute()</code>中显式计算<span
+class="math inline">\(\tau = k_p(q^-q)+k_d(\dot q^-\dot
+q)+\tau_{ff}\)</span>并按 effort_limit 裁剪。</p></li>
+<li><p>dc_actuator.py：Extends <code>IdealPdActuator</code> with
+velocity-dependent torque saturation to model DC motor torque-speed
+curves (back-EMF effects). Implements a linear torque-speed curve:
+maximum torque at zero velocity, zero torque at maximum
+velocity.</p></li>
+<li><p>learned_actuator.py：LearnedMlpActuator 加载 TorchScript
+网络，用历史位置误差与速度（CircularBuffer）推理输出扭矩，再走 DC
+电机限幅。</p></li>
+<li><p>xml_actuator.py：XML actuators wrap actuators already defined in
+your robot’s XML file. The config finds existing actuators by matching
+their <code>target</code> joint name against the
+<code>target_names_expr</code> patterns. Each joint must have exactly
+one matching actuator. The actuator type (position, velocity, motor,
+muscle) is auto detected from the XML element, or you can set
+<code>command_field</code> explicitly.</p></li>
+</ul></li>
+</ul>
+<h2 id="custom-actuators">Custom Actuators</h2>
+<p>All actuators implement a unified <code>compute()</code> interface
+that receives an <code>ActuatorCmd</code> (containing position,
+velocity, and effort targets) and returns control signals for the
+low-level MuJoCo actuators driving each joint.</p>
+<p><strong>Core interface:</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">compute</span>(<span class="params">self, cmd: ActuatorCmd</span>) -&gt; torch.Tensor:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Convert high-level commands to control signals.</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    Args:</span></span><br><span class="line"><span class="string">        cmd: Command containing position_target, velocity_target,</span></span><br><span class="line"><span class="string">            effort_target (each is a [num_envs, num_targets] tensor</span></span><br><span class="line"><span class="string">            or None)</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">    Returns:</span></span><br><span class="line"><span class="string">        Control signals for this actuator</span></span><br><span class="line"><span class="string">        ([num_envs, num_targets] tensor)</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br></pre></td></tr></table></figure>
+<p><strong>Lifecycle hooks:</strong></p>
+<ul>
+<li><p><code>edit_spec</code>: Modify MjSpec before compilation (add
+actuators, set gains)</p></li>
+<li><p><code>initialize</code>: Post-compilation setup (resolve indices,
+allocate buffers)</p></li>
+<li><p><code>reset</code>: Per-environment reset logic</p></li>
+<li><p><code>update</code>: Pre-step updates</p></li>
+<li><p><code>compute</code>: Convert commands to control
+signals</p></li>
+</ul>
+<p><strong>Properties:</strong></p>
+<ul>
+<li><p><code>target_ids</code>: Tensor of local target indices
+controlled by this actuator</p></li>
+<li><p><code>target_names</code>: List of target names controlled by
+this actuator</p></li>
+<li><p><code>ctrl_ids</code>: Tensor of global control input indices for
+this actuator</p></li>
+</ul>
+<p><code>IdealPdActuator</code> is the recommended base class for custom
+explicit actuators.</p>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

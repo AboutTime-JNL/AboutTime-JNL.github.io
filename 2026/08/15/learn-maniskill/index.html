@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maniskill学习（Maniskill Learning） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Maniskill学习（Maniskill Learning）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <h2 id="机器人与环境-robot-environment">1. 机器人与环境 (Robot &amp;
+Environment)</h2>
+<ul>
+<li><p><strong>位姿 (Pose)</strong>:</p>
+<ul>
+<li><p>定义物体在 3D 空间中的位置和方向。</p></li>
+<li><p><strong>组成</strong>: 3D 位置 (Position) + 4D 四元数
+(Quaternion)。</p></li>
+<li><p><strong>注意</strong>: ManiSkill/SAPIEN 中的四元数格式为
+<strong><code>wxyz</code></strong> (实部在前)。</p></li>
+</ul></li>
+<li><p><strong>对象分类</strong>:</p>
+<ul>
+<li>ManiSkill/SAPIEN 中的对象主要分为两类：<strong>Actor (刚体)</strong>
+和 <strong>Articulation (关节体)</strong>。</li>
+</ul></li>
+</ul>
+<h3 id="actors-单体对象">Actors (单体对象)</h3>
+<p>通常指受力后整体移动、不发生形变的“单一”物体。</p>
+<ul>
+<li><p><strong>属性</strong>:</p>
+<ul>
+<li><p><code>pose</code>: 3D 空间位置 (单位: 米)。</p></li>
+<li><p><code>linear velocity</code>: 线速度 (x, y, z, 单位:
+m/s)。</p></li>
+<li><p><code>angular velocity</code>: 角速度 (x, y, z, 单位:
+rad/s)。</p></li>
+</ul></li>
+<li><p><strong>三种类型</strong>:</p>
+<ol type="1">
+<li><p><strong>Dynamic (动态)</strong>:
+完全物理模拟。受力会像真实世界一样反应。</p></li>
+<li><p><strong>Kinematic (运动学)</strong>:
+部分物理模拟。受力<strong>不会</strong>移动或变形，但与 Dynamic
+物体碰撞时，Dynamic 物体会受到反作用力。比 Dynamic 节省资源。</p></li>
+<li><p><strong>Static (静态)</strong>: 与 Kinematic
+物理特性相同，但<strong>不能</strong>在加载后改变位姿。最节省 CPU/GPU
+内存。</p></li>
+</ol></li>
+</ul>
+<h3 id="articulations-关节体">Articulations (关节体)</h3>
+<p>由 <strong>Links (连杆)</strong> 和 <strong>Joints (关节)</strong>
+组成。</p>
+<ul>
+<li><p>任意两个 Link 由一个 Joint 连接。</p></li>
+<li><p>通常通过 URDF/XML 树状结构定义。</p></li>
+<li><p><strong>关节类型</strong>: Fixed (固定), Revolute (旋转),
+Prismatic (平移)。</p></li>
+</ul>
+<h3 id="模拟生命周期">模拟生命周期</h3>
+<ol type="1">
+<li><p><strong>Reconfiguration (重构)</strong>: 加载所有对象。</p></li>
+<li><p><strong>Initialization (初始化)</strong>: 设置所有对象的 Pose
+和初始状态。</p></li>
+<li><p><strong>Simulation (模拟)</strong>: 开始物理步进。</p></li>
+</ol>
+<hr />
+<h2 id="gpu-模拟原理-gpu-simulation">2. GPU 模拟原理 (GPU
+Simulation)</h2>
+<p>ManiSkill 通过 GPU 并行化实现单卡同时模拟数千个任务。</p>
+<ul>
+<li><p><strong>Sub-scenes (子场景)</strong>:</p>
+<ul>
+<li><p>所有 Actor 和 Articulation 都在同一个 PhysX 大场景中。</p></li>
+<li><p>每个任务被分配到一个小的 <strong>子场景 (Sub-scene)</strong>
+工作区。</p></li>
+<li><p>数据读取时会自动处理坐标，使其相对于子场景中心，而非 PhysX
+场景原点。</p></li>
+<li><p><strong>注意</strong>:
+如果物体跑出子场景范围，可能会干扰其他子场景（虽然 ManiSkill
+会自动设置合适的间距 <code>sim_config.spacing</code>）。</p></li>
+</ul></li>
+</ul>
+<p><img src="Maniskill-Btq1bWab4oA9DixOrY9c4nHEnXd.png" /></p>
+<h3 id="核心流程">核心流程</h3>
+<h4 id="env.reset-流程"><code>env.reset</code> 流程</h4>
+<ol type="1">
+<li><p><strong>Reconfiguration</strong>:
+加载对象（Actor/Articulation/Light）到场景，仅生成，不做其他操作。</p></li>
+<li><p><code>physx_system.gpu_init()</code>: 初始化 GPU
+显存缓冲区和渲染组。</p></li>
+<li><p><strong>Initialize</strong>: 设置所有对象的初始 Pose、qpos
+(关节位置) 等。</p></li>
+<li><p><code>physx_system.gpu_apply_*</code>: 将初始数据写入 GPU
+缓冲区。</p></li>
+<li><p><code>physx_system.gpu_update_articulation_kinematics()</code>:
+更新关节运动学数据。</p></li>
+<li><p><code>physx_system.gpu_fetch_*</code>: 从 GPU 获取数据生成
+Observation。</p>
+<ul>
+<li>*代码中 <strong><code>physx_system</code></strong> 通常对应
+**<code>env.scene.px</code>*</li>
+</ul></li>
+</ol>
+<p><img src="Maniskill-PS4ubKw78oIKOSxUYnRcMPxrnsd.png" /></p>
+<h4 id="env.step-流程"><code>env.step</code> 流程</h4>
+<ol type="1">
+<li><p>获取用户 Action（可能包含裁剪）。</p></li>
+<li><p>将 Action 转换为目标关节位置/速度控制信号。</p></li>
+<li><p>运行 <code>gpu_apply_articulation_target_*</code>
+应用控制目标。</p></li>
+<li><p>运行 <code>physx_system.step()</code> 多次进行物理步进。</p></li>
+<li><p>运行 <code>gpu_fetch_*</code> 更新 GPU 缓冲区并生成
+Observation。</p></li>
+<li><p>返回 <code>step</code> 数据 (obs, reward, terminated, truncated,
+info)。</p></li>
+</ol>
+<p><img src="Maniskill-GvvsbjjqDoaObpxn6sMcNvC0nMd.png" /></p>
+<h3 id="gpu-数据组织">GPU 数据组织</h3>
+<ul>
+<li><p>所有刚体数据 (Pose 7D, Linear Vel 3D, Angular Vel 3D) 在 GPU
+中被紧密打包成一个大矩阵
+<code>physx_system.cuda_rigid_body_data</code>。</p></li>
+<li><p><strong>权衡</strong>: 这种内存布局为了性能牺牲了直观性（不保证每
+K 行对应一个子场景）。如果你直接操作 GPU buffer 需要注意，使用 API
+则无需关心。</p></li>
+</ul>
+<p><img src="Maniskill-DypObpm6Toq4BExJQ9kctrcdnCc.png" /></p>
+<hr />
+<h2 id="控制-control">3. 控制 (Control)</h2>
+<p>底层控制均为关节位置 (Position) 或关节速度 (Velocity)。</p>
+<h3 id="控制器类型-controllers">控制器类型 (Controllers)</h3>
+<ol type="1">
+<li><p><strong>Passive (被动控制)</strong></p>
+<ul>
+<li><p><code>PassiveControllerConfig</code></p></li>
+<li><p>强制关节不受 Action 控制（例如 CartPole 的杆连接处）。</p></li>
+</ul></li>
+<li><p><strong>PD Joint Position (PD 关节位置)</strong></p>
+<ul>
+<li><p><code>PDJointPosControllerConfig</code></p></li>
+<li><p>通过 PD 控制器直接控制关节角度/位置。</p></li>
+</ul></li>
+<li><p><strong>PD EE Pose (末端执行器位姿)</strong></p>
+<ul>
+<li><p><code>PDEEPoseControllerConfig</code></p></li>
+<li><p>通过逆运动学 (IK) 控制末端 (End-Effector) 或任意 Link
+的位姿。</p></li>
+<li><p><strong>特点</strong>: 解耦平移和旋转控制。</p></li>
+<li><p><strong>坐标系 (Frames)</strong>:</p>
+<ul>
+<li><p>World Frame (世界坐标)</p></li>
+<li><p>Root Link Frame (机器人基座坐标)</p></li>
+<li><p>End Effector / Body Frame (末端坐标)</p></li>
+</ul></li>
+</ul></li>
+</ol>
+<p><img src="Maniskill-S9wpbHhoto7PsoxTLrQcdNEDngc.png" /></p>
+<pre><code>- **控制模式**:
+
+    - **Delta Control \(增量控制\)**: 默认开启 \(`use_delta=True`\)。Action 代表相对移动量。
+
+    - **Non Delta Control**: 类似运动规划，Action 代表绝对目标位姿。
+
+- **常见的 Frame 组合 \(Delta模式下\)**:
+
+    - `root_translation:root_aligned_body_rotation` \(默认\): 平移基于基座坐标，旋转基于基座对齐的本体坐标。
+
+    - `body_translation`: 平移基于末端坐标（例如“向前”是向抓手前方）。</code></pre>
+<ol start="4" type="1">
+<li><p><strong>PD EE Pos (末端执行器位置)</strong></p>
+<ul>
+<li><p><code>PDEEPosControllerConfig</code></p></li>
+<li><p>与上面类似，但<strong>只控制位置
+(3D)</strong>，没有旋转控制。</p></li>
+</ul></li>
+</ol>
+<h2 id="观测-observation">4. 观测 (Observation)</h2>
+<p>通过 <code>gym.make(env_id, obs_mode=...)</code>
+设置。返回格式通常为字典。</p>
+<h3 id="观测模式-obs-modes">观测模式 (Obs Modes)</h3>
+<h3 id="关键数据格式">关键数据格式</h3>
+<ul>
+<li><p><strong>RGB</strong>: <code>[H, W, 3]</code>,
+<code>uint8</code>.</p></li>
+<li><p><strong>Depth</strong>: <code>[H, W, 1]</code>,
+<code>int16</code>, 单位 <strong>毫米 (mm)</strong>. 0
+代表无效/无穷远。</p></li>
+<li><p><strong>Segmentation</strong>: <code>[H, W, 1]</code>,
+<code>int16</code>. 对象 ID 掩码。</p></li>
+</ul>
+<h3 id="分割数据-segmentation">分割数据 (Segmentation)</h3>
+<ul>
+<li><p>每个对象加载时分配唯一的 <code>per_scene_id</code>。</p></li>
+<li><p><strong>ID 0</strong> 通常指远处的背景。</p></li>
+<li><p><strong>查询代码</strong>:</p></li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查看 ID 对应的对象名称</span></span><br><span class="line"><span class="keyword">for</span> obj_id, obj <span class="keyword">in</span> <span class="built_in">sorted</span>(env.unwrapped.segmentation_id_map.items()):</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">f&quot;<span class="subst">&#123;obj_id&#125;</span>: <span class="subst">&#123;obj.name&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
+<hr />
+<h2 id="相机与传感器-cameras-sensors">5. 相机与传感器 (Cameras &amp;
+Sensors)</h2>
+<h3 id="相机分类">相机分类</h3>
+<ol type="1">
+<li><p><strong>Sensors</strong>: Agent 用于决策的观测相机。</p></li>
+<li><p><strong>Human Render</strong>: 供人类观看的高质量相机。</p></li>
+<li><p><strong>Viewer</strong>: GUI 界面使用的相机。</p></li>
+</ol>
+<h3 id="配置-configuration">配置 (Configuration)</h3>
+<p>在 <code>gym.make</code> 中通过 <code>sensor_configs</code>
+等参数覆盖默认设置：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">gym.make(<span class="string">&quot;PickCube-v1&quot;</span>,</span><br><span class="line">  sensor_configs=<span class="built_in">dict</span>(width=<span class="number">320</span>, height=<span class="number">240</span>),</span><br><span class="line">  human_render_camera_configs=<span class="built_in">dict</span>(shader_pack=<span class="string">&quot;rt&quot;</span>),</span><br><span class="line">  viewer_camera_configs=<span class="built_in">dict</span>(fov=<span class="number">1</span>),</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>*也可以指定特定相机名：
+**<code>dict(camera_0=dict(width=320...))</code>*</p>
+<h3 id="着色器-shaders">着色器 (Shaders)</h3>
+<ul>
+<li><p><strong>minimal</strong>: 最快，最小显存，背景全黑。</p></li>
+<li><p><strong>default</strong>: 速度与纹理的平衡。</p></li>
+<li><p><strong>rt / rt-med / rt-fast</strong>: 光线追踪
+(Ray-tracing)，照片级真实感，速度依次递增，质量递减。</p></li>
+</ul>
+<h3 id="纹理-textures">纹理 (Textures)</h3>
+<ul>
+<li><p><strong>rgb</strong>: 颜色 (0-255).</p></li>
+<li><p><strong>depth</strong>: 深度 (mm).</p></li>
+<li><p><strong>position</strong>:
+<code>[x, y, z, seg_id]</code>.</p></li>
+<li><p><strong>segmentation</strong>: 分割 ID.</p></li>
+<li><p><strong>normal</strong>: 法线向量.</p></li>
+<li><p><strong>albedo</strong>: 反照率颜色.</p></li>
+</ul>
+<hr />
+<h2 id="复现性与随机数-reproducibility">6. 复现性与随机数
+(Reproducibility)</h2>
+<p>由于 GPU 并行和随机化，复现需要特定技巧。</p>
+<h3 id="方法-1-使用-batched-rng-推荐">方法 1: 使用 Batched RNG
+(推荐)</h3>
+<p>ManiSkill 推荐使用环境自带的
+<code>_batched_episode_rng</code>，它是确定性的。</p>
+<ul>
+<li><p><strong>机制</strong>: <code>env.reset(seed=x)</code></p>
+<ul>
+<li><p>如果是单个整数 <code>x</code>: 第一个环境种子为
+<code>x</code>，其余环境基于 <code>x</code> 衍生随机种子。</p></li>
+<li><p>如果是列表 <code>[x1, x2, ...]</code>:
+每个环境分别对应列表中的种子（完全可控）。</p></li>
+</ul></li>
+<li><p>主要用于环境重构（加载哪些物体/纹理）。</p></li>
+</ul>
+<h3 id="方法-2-环境状态-env-state">方法 2: 环境状态 (Env State)</h3>
+<p>用于 Episode 初始化（物体位置、速度等）。</p>
+<ul>
+<li><p>环境状态包含：关节角度、关节速度、Pose、速度。</p></li>
+<li><p><strong>不包含</strong>: 纹理、几何形状、固定相机位置（这些由
+Seed 决定）。</p></li>
+<li><p><strong>复现流程</strong>: 使用相同的 Seed (保证物体一致) -&gt;
+<code>env.reset()</code> -&gt; 加载并设置保存的 State
+(保证位置一致)。</p></li>
+</ul>
+<p>自定义任务</p>
+<p>Building a custom task in ManiSkill is comprised of the following
+core components</p>
+<ol type="1">
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#setting-up-the-task-class">Setting
+up the Task Class</a></p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#loading">Loading
+(Robots, Assets, Sensors, etc.)</a> (run once)</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#episode-initialization-randomization">Episode
+initialization / Randomization</a> (run every env.reset)</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#success-failure-conditions">Success/Failure
+Condition</a> (run every env.step)</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#extra-observations">Extra
+Observations</a> (run every env.step)</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#optional-dense-reward-function">(Optional)
+Dense Reward Function</a> (run every env.step)</p></li>
+<li><p><a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#optional-setting-up-cameras-sensors-for-observations-and-recording">(Optional)
+Setting up cameras/sensors for observations and rendering/recording</a>
+(run once)</p></li>
+</ol>
+<h2 id="setting-up-the-task-class">Setting up the Task Class</h2>
+<p>All tasks are defined by their own class and must inherit <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/api/mani_skill/envs/sapien_env/index.html#mani_skill.envs.sapien_env.BaseEnv"><code>BaseEnv</code></a>,
+similar to the design of many other robot learning simulation
+frameworks. You must then also register the class with a decorator so
+that the environment can be easily created via the
+<code>gym.make(env_id=...)</code> command in the future. Environment
+registration is done via
+<code>@register_env(env_id, max_episode_steps=...)</code> where
+<code>max_episode_steps</code> indicates the time limit of the task.</p>
+<p>import sapienfrom mani_skill.utils import sapien_utils, commonfrom
+mani_skill.envs.sapien_env import BaseEnvfrom
+mani_skill.utils.registration import register_<a
+href="mailto:env@register"
+class="email">env@register</a>_env("PushCube-v1",
+max_episode_steps=50)class PushCubeEnv(BaseEnv):def
+<strong>init</strong>(self, *args,
+**kwargs):super().<strong>init</strong>(*args, **kwargs)</p>
+<h2 id="loading">Loading</h2>
+<p>At the start of any task, you must load in all objects (robots,
+assets, articulations, lighting etc.) into each parallel environment,
+also known as a sub-scene. This is also known as
+<strong>reconfiguration</strong> and generally only ever occurs once.
+Loading these objects is done in the <code>_load_scene</code> function
+of your custom task class. The objective is to simply load objects in
+with initial poses that ensure they don’t collide on the first step, and
+nothing else. For GPU simulation at this stage you cannot change any
+object states (like velocities, qpos), only initial poses can be
+modified. Changing/randomizing states is done in the section on <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/intro.html#episode-initialization-randomization">episode
+initialization / randomization</a>.</p>
+<p>Building objects in ManiSkill is nearly the exact same as it is in
+SAPIEN. You create an <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/api/mani_skill/utils/building/actor_builder/index.html#mani_skill.utils.building.actor_builder.ActorBuilder"><code>ActorBuilder</code></a>
+via <code>self.scene.create_actor_builder</code> and via the actor
+builder add visual and collision shapes. Visual shapes only affect
+visual rendering processes while collision shapes affect the physical
+simulation. ManiSkill further will create the actor for you in every
+sub-scene (unless you use <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/advanced.html#scene-masks">scene-masks/scene-idxs</a>,
+a more advanced feature for enabling heterogeneous simulation).</p>
+<h3 id="building-robots">Building Robots</h3>
+<p>This is the simplest part and requires almost no additional work
+here. Robots are added in for you automatically and by default are
+initialized at the origin. You can specify the default robot(s) added in
+via the init function. In PushCube this is done as so by adding
+<code>SUPPORTED_ROBOTS</code> to ensure users can only run your task
+with the selected robots. You can further add typing if you wish to the
+<code>agent</code> class attribute.</p>
+<p>from mani_skill.agents.robots import Fetch, Pandaclass
+PushCubeEnv(BaseEnv):SUPPORTED_ROBOTS = ["panda", "fetch"]agent:
+Union[Panda, Fetch]def <strong>init</strong>(self, *args,
+robot_uids="panda", **kwargs):# robot_uids="fetch" is possible, or even
+multi-robot # setups via robot_uids=("fetch",
+"panda")super().<strong>init</strong>(*args, robot_uids=robot_uids,
+**kwargs)def _load_agent(self, options:
+dict):super()._load_agent(options, sapien.Pose(p=[0, 0, 1]))</p>
+<p>To define the initial pose of the robot you override the
+<code>_load_agent</code> function. This is done in PushCube above. It is
+recommended to set initial poses for all objects such that if they were
+spawned there they don’t intersect other objects. Here we spawn the
+robot 1 meter above the ground which won’t clash with anything else. If
+you are intending to spawn multiple robots you can pass a list of poses
+to the <code>_load_agent</code> function.</p>
+<p>Initializing/randomizing these robots occurs in the initialization /
+randomization section covered later. With this setup you can later
+access agent data via <code>self.agent</code> and the specific
+articulation data of the robot via <code>self.agent.robot</code>. For
+multi-robot setups you can access each agent via
+<code>self.agent.agents</code>.</p>
+<p>To create your own custom robots/agents, see the <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_robots.html">custom
+robots tutorial</a>.</p>
+<h3 id="building-actors">Building Actors</h3>
+<p>The <code>_load_scene</code> function must be implemented to build
+objects besides agents. It is also given an <code>options</code>
+dictionary which is the same options dictionary passed to
+<code>env.reset</code> and defaults to an empty dictionary (which may be
+useful for controlling how to load a scene with just reset
+arguments).</p>
+<p>Building a <strong>dynamic</strong> actor like a cube in PushCube is
+done as so</p>
+<p>class PushCubeEnv(BaseEnv):# ...def _load_scene(self, options:
+dict):# ...builder =
+self.scene.create_actor_builder()builder.add_box_collision(# for boxes
+we specify half length of each sidehalf_size=[0.02] *
+3,)builder.add_box_visual(half_size=[0.02] *
+3,material=sapien.render.RenderMaterial(# RGBA values, this is a red
+cubebase_color=[1, 0, 0, 1],),)# strongly recommended to set initial
+poses for objects, even if you plan to modify them
+laterbuilder.initial_pose = sapien.Pose(p=[0, 0, 0.02], q=[1, 0, 0,
+0])self.obj = builder.build(name="cube")# PushCube has some other code
+after this removed for brevity that # spawns a goal object (a red/white
+target) stored at self.goal_region</p>
+<p>You can build a <strong>kinematic</strong> actor with
+<code>builder.build_kinematic</code> and a <strong>static</strong> actor
+with <code>builder.build_static</code>. A few sharp bits to keep in
+mind</p>
+<ul>
+<li><p>Dynamic actors can be moved around by forces/other objects (e.g.
+a robot) and are fully physically simulated</p></li>
+<li><p>Kinematic and static actors are fixed in place but can block
+objects from moving through them (e.g. a wall, a kitchen
+counter).</p></li>
+<li><p>Kinematic actors can have their pose changed at any time. Static
+actors must have an initial pose set before calling
+<code>build_static</code> via
+<code>builder.initial_pose = ...</code></p></li>
+<li><p>Use static instead of kinematic whenever possible as it saves a
+lot of GPU memory. Static objects must have an initial pose set before
+building via <code>builder.initial_pose = ...</code>.</p></li>
+</ul>
+<p>Note that by default, if an object does not have an initial pose set
+in its builder, ManiSkill will set it to a default pose of
+<code>q=[1,0,0,0], p=[0,0,0]</code> and give a warning. For simple tasks
+this may not matter but when working with more complex objects and
+articulations, it is strongly recommended to set initial poses for all
+objects as GPU simulation might run into bugs/issues if the objects at
+their initial poses collide.</p>
+<p>We also provide some functions that build some more complex shapes
+that you can use by importing the <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/api/mani_skill/utils/building/actors/index.html#module-mani_skill.utils.building.actors"><code>actors</code></a>
+package:</p>
+<p>from mani_skill.utils.building import actors</p>
+<p>Once built, the return value of <code>builder.build...</code> is an
+<code>Actor</code> object, which manages every parallel instance of the
+built object in each sub-scene. Now the following occurs which makes it
+easy to build task rewards, success evaluations etc.</p>
+<p>self.obj.pose.p # batched positions of shape (N, 3)self.obj.pose.q #
+batched quaternions of shape (N, 4)self.obj.linear_velocity # batched
+velocities of shape (N, 3)# and more ...</p>
+<p>For object building, you can also use reusable pre-built scene
+builders (tutorial on how to customize/make your own <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_reusable_scenes.html">here</a>).
+In Push Cube it is done as so</p>
+<p>class PushCubeEnv(BaseEnv):# ...def _load_scene(self, options:
+dict):self.table_scene =
+TableSceneBuilder(env=self,)self.table_scene.build()# ...</p>
+<p>The TableSceneBuilder is perfect for easily building table-top tasks,
+it creates a table and floor for you, and places the fetch and panda
+robots in reasonable locations.</p>
+<p>A tutorial on how to build actors beyond primitive shapes (boxes,
+spheres etc.) and load articulated objects is covered in the <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/loading_objects.html">tutorial
+after this one</a>. More advanced features like heterogeneous simulation
+with different objects/articulations in different parallel environments
+is covered in the <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/tutorials/custom_tasks/advanced.html">advanced
+features page</a>. Finally, if you intend on randomizing
+objects/textures etc. in parallel environments, we highly recommend
+understanding the <a
+target="_blank" rel="noopener" href="https://maniskill.readthedocs.io/en/latest/user_guide/concepts/rng.html">batched
+RNG system</a> which details how to ensure reproducibility in your
+environments.</p>
+<p>We recommend you to first complete this tutorial before moving onto
+the next.</p>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

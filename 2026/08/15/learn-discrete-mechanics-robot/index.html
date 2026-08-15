@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>离散力学—机器人应用（Discrete Mechanics — Applications in Robotics） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>离散力学—机器人应用（Discrete Mechanics — Applications in Robotics）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <h1
+id="discrete-geometric-optimal-control-on-lie-groups2011-tro">Discrete
+Geometric Optimal Control on Lie Groups（2011 TRO）</h1>
+<h2 id="研究问题">研究问题</h2>
+<ul>
+<li>本文聚焦于李群上机械系统的最优控制问题，具体研究如何利用离散变分原理和几何结构，构建能保持系统运动不变量（如辛结构、动量等）的数值方法，以实现机械系统从初始状态到目标状态的最优轨迹规划。研究对象包括全驱动系统和欠驱动系统，涉及在李群上的配置空间中，如何处理系统的动力学特性、控制约束及优化目标，核心是解决传统数值方法在处理非线性状态空间时存在的精度低、稳定性差及难以保留几何特性等问题。</li>
+</ul>
+<h2 id="研究方法">研究方法</h2>
+<ul>
+<li><p>Such a construction enables the preservation of important
+properties of the mechanical system—group structure, momentum, and
+symplectic structure—and results in algorithms with provable accuracy
+and stability.</p></li>
+<li><p>Our approach is designed for accurate and numerically stable
+computation</p></li>
+<li><p>Our approach is based on recently developed structurepreserving
+numerical integration and optimal control methods.</p></li>
+<li><p>employs variational integrators [6], [7] that are derived from
+the discretization of variational principles such as Hamilton’s
+principle for conservative systems or the DLA principle for dissipative
+systems.</p></li>
+<li><p>In particular, to find trajectories that extremize an action
+similar to (2) can be equivalently stated as to compute geodesics for a
+higher order system known as Riemannian cubics [15]. Riemannian cubics
+are generalizations of straight lines on a manifold for which, roughly
+speaking, the higher order system velocity corresponds to the
+acceleration of the original system.</p></li>
+<li><p>Finally, we point out that group structure and symmetries play an
+important role in robotic dynamics and motion control</p></li>
+<li><p>A mechanical integrator advances a dynamical system forward in
+time. Such numerical algorithms are typically constructed by the direct
+discretization of the differential equations that describe the
+trajectory of the system, resulting in an update rule to compute the
+next state in time. In contrast, variational integrators [7] are based
+on the idea that the update rule for a discrete mechanical system (i.e.,
+the time stepping scheme) should be derived directly from a variational
+principle rather than from the resulting differential
+equations.</p></li>
+<li><p>Although this variational approach may seem more mathematically
+motivated than numerically relevant, integrators that respect
+variational properties exhibit improved numerics and remedy many
+practical issues in physically based simulation and animation. First,
+variational integrators automatically preserve (linear and angular)
+momenta exactly (because of the invariance of the Lagrangian with
+respect to translation and rotation) while providing good energy
+conservation over exponentially long simulation times for
+non-dissipative systems. Second, arbitrarily accurate integrators can be
+obtained through a simple change of quadrature rules. Finally, they
+preserve the symplectic structure of the system, resulting in a
+much-improved treatment of damping that is essentially independent of
+time step</p></li>
+</ul>
+<h2 id="研究缺陷">研究缺陷</h2>
+<ol type="1">
+<li><p>适用范围局限：主要针对低维李群（如 SE (2)、SO (3)、SE
+(3)），对高维或更复杂的李群系统，其理论和算法的扩展性尚未充分验证，在处理多体系统或非完整约束系统时存在挑战。</p></li>
+<li><p>控制约束处理不足：对于欠驱动系统的可控性分析不够深入，未明确给出离散可控性的判定条件，当系统存在强约束或高度非线性时，算法可能难以收敛。</p></li>
+<li><p>数值实现依赖经验参数：在轨迹初始化、分辨率选择等方面依赖经验值，如最小分辨率的确定缺乏理论依据，迭代过程中对奇点的处理（如随机扰动）可能影响结果的稳定性和精度。</p></li>
+<li><p>理论证明不完整：对离散变分原理与连续系统的收敛性分析不足，未严格证明离散最优解收敛到连续最优解，且对高阶精度的变分积分器研究较少，限制了方法在高精度场景的应用。</p></li>
+</ol>
+<h1
+id="structure-preserving-constrained-optimal-trajectory-planning-of-a-wheeled-inverted-pendulum2020-tro">Structure-Preserving
+Constrained Optimal Trajectory Planning of a Wheeled Inverted
+Pendulum（2020 TRO）</h1>
+<h2 id="研究问题-1">研究问题</h2>
+<ul>
+<li>本文聚焦于轮式倒立摆（WIP）这一欠驱动、非完整约束的机电系统，旨在解决其轨迹规划与控制中的核心挑战。具体而言，研究需在考虑状态和控制约束（如输入电压、电流限制、倾斜角度范围等）的同时，保持系统的配置流形结构，设计出稳定且最优的轨迹。由于
+WIP 存在非完整约束（如纯滚动无滑动）和欠驱动特性，传统控制方法难以在复杂
+maneuvers（如急转弯）中兼顾约束满足与轨迹最优性，且常规离散化方法可能破坏系统几何特性，导致精度和稳定性问题</li>
+</ul>
+<h1
+id="time-optimal-handover-trajectory-planning-for-aerial-manipulators-based-on-discrete-mechanics-and-complementarity-constraints2023-tro">Time-Optimal
+Handover Trajectory Planning for Aerial Manipulators Based on Discrete
+Mechanics and Complementarity Constraints（2023 TRO）</h1>
+<h2 id="研究问题-2">研究问题</h2>
+<ul>
+<li>本文研究的核心问题是空中机械臂与移动机器人之间的时间最优交接轨迹规划，具体而言，需解决以下挑战：如何在考虑空中机械臂完整动力学特性的同时，自动确定与移动目标的最优交接时机，确保交接过程满足相对速度限制、航向一致性等任务要求，并使总运行时间最短。传统方法常需手动设计交接轨迹或忽略系统动力学，难以在动态目标场景中平衡时间最优性与物理可行性，而现有优化框架在处理交接时机与动力学约束的耦合问题上存在局限。</li>
+</ul>
+<h2 id="研究方法-1">研究方法</h2>
+<ul>
+<li>将优化问题中的系统动力学方程转化为离散Euler-Lagrange方程</li>
+</ul>
+<h1 id="离散时间系统">离散时间系统</h1>
+<h1
+id="direct-collocation-methods-for-trajectory-optimization-in-constrained-robotic-systems2023-tro">Direct
+Collocation Methods for Trajectory Optimization in Constrained Robotic
+Systems（2023 TRO）</h1>
+<h2 id="研究问题-3">研究问题</h2>
+<p>本文聚焦于受约束机器人系统（如存在完整约束或非完整约束的机械系统）在轨迹优化中面临的核心挑战：直接配置法在离散化过程中易导致轨迹偏离由约束定义的流形，产生运动学误差，进而引发物理上不一致的运动，增加控制器跟踪难度。具体而言，现有方法要么忽略运动学约束导致漂移累积，要么通过修改系统动力学（如添加人工力或能量耗散）来维持轨迹在流形附近，均存在局限性。</p>
+<h2 id="研究方法-2">研究方法</h2>
+<ul>
+<li>In essence, all trajectory optimization methods solve an instance of
+the variational problem of optimal control. Two strategies are mainly
+followed [5]. Indirect approaches initially derive the Pontryagin
+conditions of optimality and then solve the resulting boundary-value
+problem numerically. Direct approaches, in contrast, discretize the
+optimal control problem at the outset and, then, tackle the discrete
+problem with nonlinear programming (NLP) methods.</li>
+</ul>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>

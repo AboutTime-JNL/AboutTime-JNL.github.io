@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mjlab学习——RL &amp; Scripts（Mjlab Learning - RL &amp; Scripts） | JNL&#39;s Life Store</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta name="generator" content="Hexo 7.3.0"></head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <h1><a href="/">JNL&#39;s Life Store</a></h1>
+      <nav>
+        <a href="/">首页</a>
+        
+        <a href="/categories/learn/">学习</a>
+        <a href="/categories/daily/">日常</a>
+        
+        <a href="/about">关于</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+  <h1>Mjlab学习——RL &amp; Scripts（Mjlab Learning - RL &amp; Scripts）</h1>
+  <div class="meta">发布于：2026-08-15</div>
+  
+  <div class="content">
+    <h1 id="mjlabrl">Mjlab——RL</h1>
+<p>该目录提供强化学习训练适配层，包括训练配置、runner、向量化环境包装与导出工具等，主要作用是把
+mjlab 环境与具体 RL 算法/训练框架高效衔接。</p>
+<ul>
+<li><p>config.py：RSL-RL
+配置定义文件，集中定义模型配置（actor/critic）、PPO 算法配置和 runner
+配置（日志、恢复训练、步数、保存策略等）。</p></li>
+<li><p>runner.py：自定义训练运行器 MjlabOnPolicyRunner，在 RSL-RL
+OnPolicyRunner 基础上扩展：兼容旧 checkpoint
+迁移、保存/恢复环境状态、ONNX 导出与模型上传控制。</p></li>
+<li><p>vecenv_wrapper.py：环境适配层 RslRlVecEnvWrapper，把
+ManagerBasedRlEnv 适配为 RSL-RL VecEnv 接口，处理
+reset/step、动作裁剪、done/time_outs 语义和 TensorDict 输出。</p></li>
+<li><p>spatial_softmax.py：视觉策略组件，提供 SpatialSoftmax 与基于它的
+CNN 模型封装，用空间 soft-argmax
+将特征图转换为关键点特征，供策略网络使用。</p></li>
+<li><p>exporter_utils.py：策略导出辅助工具，负责提取环境/机器人元信息并写入
+ONNX metadata，便于部署侧解析关节名、增益、默认位和动作缩放等。</p></li>
+</ul>
+<h1 id="mjlabscripts">Mjlab——Scripts</h1>
+<p>该目录存放实用脚本与工作流入口（如训练、演示、播放、导出、可视化与数据转换等），用于快速执行常见实验操作，降低日常开发、调试和实验复现成本。</p>
+<ul>
+<li><p>train.py：训练主脚本，负责任务配置加载、环境构建、恢复训练、W&amp;B
+checkpoint 对接、单机/多 GPU 启动与日志落盘</p>
+<p><code>--num-envs</code></p>
+<p>Number of parallel simulation environments.</p>
+<p><code>--gpu-ids</code></p>
+<p>GPU indices to use. Pass multiple indices for multi-GPU training (see
+<a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/training/distributed_training.html#distributed-training">Distributed
+Training</a>), or <code>None</code> for CPU mode.</p>
+<p><code>--video</code></p>
+<p>Record training rollout videos to
+<code>&#123;log_dir&#125;/videos/train/</code>.</p>
+<p><code>--enable-nan-guard</code></p>
+<p>Enable NaN detection and state capture (see <a
+target="_blank" rel="noopener" href="https://mujocolab.github.io/mjlab/main/source/debugging/nan_guard.html#nan-guard">NaN
+Guard</a>).</p></li>
+<li><p>play.py：推理/播放主脚本，支持加载本地或 W&amp;B checkpoint，选择
+native/viser viewer，支持 dummy policy、视频录制和在线切换
+checkpoint</p>
+<p><code>--agent</code></p>
+<p>Policy mode: <code>"trained"</code> (default), <code>"zero"</code>
+(zero actions), or <code>"random"</code> (uniform random).</p>
+<p><code>--viewer</code></p>
+<p>Viewer backend: <code>"native"</code> (MuJoCo viewer) or
+<code>"viser"</code> (browser-based).</p>
+<p><code>--no-terminations</code></p>
+<p>Disable termination conditions so the policy runs
+indefinitely.</p></li>
+<li><p>csv_to_npz.py：将动作捕捉/轨迹 CSV 转成标准化 NPZ
+运动数据，并可在仿真中回放、插值、估算速度与可选离屏渲染导出</p></li>
+<li><p>demo.py：一键 demo 入口，自动下载默认 checkpoint 与 motion
+文件，然后调用 play 流程启动预训练策略演示</p></li>
+<li><p>export_scene.py：导出任务场景或资产实体（如 g1/go1/yam）到目录或
+zip，便于离线查看、复现与分享</p></li>
+<li><p>gcs.py：云端资源下载与缓存工具，负责按 URL 拉取文件并做 SHA256
+校验（demo 模型与动作文件下载依赖它）</p></li>
+<li><p>list_envs.py：列出当前已注册的任务环境
+ID，支持关键字过滤</p></li>
+<li><p>nan_viz.py：NaN dump 可视化工具，加载 dump 的
+<code>npz+mjb</code> 后在 Viser 中逐帧检查异常状态</p></li>
+<li><p>visualize_terrain.py：地形交互可视化工具，在 Viser 中动态调参生成
+terrain，并可叠加机器人实例观察不同难度地形效果</p></li>
+</ul>
+
+  </div>
+</article>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 JNL</p>
+  </footer>
+
+</body>
+</html>
